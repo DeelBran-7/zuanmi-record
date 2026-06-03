@@ -10,6 +10,7 @@ import {
 import { getBrowserPublicSyncConfig, normalizeEmail, resolveSyncSettings } from './sync-config.js';
 
 const STORAGE_KEY = 'zuanmi-record-state-v2';
+const OWNER_KEY = 'zuanmi-record-owner-v1';
 const TROY_OUNCE_GRAMS = 31.1034768;
 const today = new Date().toISOString().slice(0, 10);
 const publicSyncConfig = getBrowserPublicSyncConfig();
@@ -64,6 +65,12 @@ let currentSession = null;
 let autoCloudDownloadUserId = null;
 
 const elements = {
+  appShell: document.querySelector('#appShell'),
+  authGate: document.querySelector('#authGate'),
+  authEmailInput: document.querySelector('#authEmailInput'),
+  authOtpInput: document.querySelector('#authOtpInput'),
+  authSendButton: document.querySelector('#authSendButton'),
+  authVerifyButton: document.querySelector('#authVerifyButton'),
   yearStrip: document.querySelector('#yearStrip'),
   tabs: document.querySelectorAll('.tab-button'),
   views: {
@@ -91,6 +98,8 @@ init();
 function init() {
   document.querySelector('#quickRecordButton').addEventListener('click', openRecordDialog);
   document.querySelector('#exportButton').addEventListener('click', exportState);
+  elements.authSendButton?.addEventListener('click', sendEmailOtp);
+  elements.authVerifyButton?.addEventListener('click', verifyEmailOtp);
   elements.tabs.forEach((button) => button.addEventListener('click', () => switchView(button.dataset.view)));
   elements.recordForm.addEventListener('submit', handleRecordSubmit);
   elements.assetForm.addEventListener('submit', handleAssetSubmit);
@@ -107,9 +116,7 @@ function init() {
   registerServiceWorker();
   initSupabaseClient();
   render();
-  if (!state.settings.initialized) {
-    elements.onboardingDialog.showModal();
-  }
+  showOnboardingIfNeeded();
 }
 
 function loadState() {
@@ -136,6 +143,8 @@ function saveState() {
 }
 
 function render() {
+  updateAuthGate();
+  if (requiresLogin()) return;
   renderYearStrip();
   renderDashboard();
   renderAssets();
@@ -640,18 +649,59 @@ function initSupabaseClient() {
   supabaseClient = window.supabase.createClient(supabaseUrl, anonKey, {
     auth: { persistSession: true, autoRefreshToken: true },
   });
-  supabaseClient.auth.getSession().then(({ data }) => {
-    currentSession = data.session;
-    renderSync();
-    autoDownloadCloudStateIfEmpty();
-  }).catch(() => {});
+  supabaseClient.auth.getSession().then(({ data }) => handleCloudSession(data.session)).catch(() => {});
   supabaseClient.auth.onAuthStateChange((event, session) => {
-    currentSession = session;
-    window.setTimeout(() => {
-      renderSync();
-      autoDownloadCloudStateIfEmpty();
-    }, 0);
+    window.setTimeout(() => handleCloudSession(session), 0);
   });
+}
+
+async function handleCloudSession(session) {
+  currentSession = session;
+  if (session?.user) {
+    prepareLocalStateForCloudUser(session.user);
+    await autoDownloadCloudStateIfEmpty();
+  }
+  render();
+  showOnboardingIfNeeded();
+}
+
+function updateAuthGate() {
+  const showGate = requiresLogin();
+  elements.authGate.hidden = !showGate;
+  elements.appShell.hidden = showGate;
+  if (showGate && state.settings.sync.email && !elements.authEmailInput.value) {
+    elements.authEmailInput.value = state.settings.sync.email;
+  }
+  if (showGate) elements.onboardingDialog.close();
+}
+
+function requiresLogin() {
+  return publicSyncConfig.configured && !currentSession?.user;
+}
+
+function showOnboardingIfNeeded() {
+  if (requiresLogin()) return;
+  if (!state.settings.initialized && !elements.onboardingDialog.open) {
+    elements.onboardingDialog.showModal();
+  }
+}
+
+function prepareLocalStateForCloudUser(user) {
+  const ownerId = localStorage.getItem(OWNER_KEY);
+  const hasLocalBook = state.assets.length || state.records.length;
+  if ((ownerId && ownerId !== user.id) || (!ownerId && hasLocalBook)) {
+    resetLocalBookForAuth(user.email);
+  }
+  localStorage.setItem(OWNER_KEY, user.id);
+  state.settings.sync.email = normalizeEmail(user.email || state.settings.sync.email);
+  saveState();
+}
+
+function resetLocalBookForAuth(email) {
+  const sync = resolveSyncSettings({ ...state.settings.sync, email }, publicSyncConfig);
+  state = structuredClone(defaultState);
+  state.settings.sync = sync;
+  saveState();
 }
 
 function renderCloudAuth(configured, signedIn) {
@@ -696,10 +746,11 @@ function getSyncSettings() {
 
 async function sendEmailOtp() {
   if (!supabaseClient) return toast('请先保存 Supabase 配置');
-  const email = normalizeEmail(document.querySelector('#emailOtpInput')?.value);
+  const email = readAuthEmail();
   if (!email) return toast('请输入邮箱');
   try {
     state.settings.sync.email = email;
+    writeAuthEmail(email);
     saveState();
     const { error } = await supabaseClient.auth.signInWithOtp({
       email,
@@ -717,8 +768,8 @@ async function sendEmailOtp() {
 
 async function verifyEmailOtp() {
   if (!supabaseClient) return toast('请先保存 Supabase 配置');
-  const email = normalizeEmail(document.querySelector('#emailOtpInput')?.value);
-  const token = document.querySelector('#otpInput')?.value.trim();
+  const email = readAuthEmail();
+  const token = readAuthToken();
   if (!email || !token) return toast('请输入邮箱和验证码');
   try {
     const { data, error } = await supabaseClient.auth.verifyOtp({ email, token, type: 'magiclink' });
@@ -726,11 +777,30 @@ async function verifyEmailOtp() {
     state.settings.sync.email = email;
     saveState();
     currentSession = data.session;
+    if (data.session?.user) {
+      prepareLocalStateForCloudUser(data.session.user);
+      await autoDownloadCloudStateIfEmpty();
+    }
     toast('登录成功');
     render();
+    showOnboardingIfNeeded();
   } catch (error) {
     toast(`验证失败：${error.message || '验证码或链接不正确'}`);
   }
+}
+
+function readAuthEmail() {
+  return normalizeEmail(elements.authEmailInput?.value || document.querySelector('#emailOtpInput')?.value || state.settings.sync.email);
+}
+
+function readAuthToken() {
+  return (elements.authOtpInput?.value || document.querySelector('#otpInput')?.value || '').trim();
+}
+
+function writeAuthEmail(email) {
+  if (elements.authEmailInput) elements.authEmailInput.value = email;
+  const syncEmailInput = document.querySelector('#emailOtpInput');
+  if (syncEmailInput) syncEmailInput.value = email;
 }
 
 async function uploadCloudState() {
@@ -755,17 +825,17 @@ async function downloadCloudState() {
   const user = await requireCloudUser();
   if (!user) return;
   if (!window.confirm('拉取云端账本会覆盖本机账本。建议先导出备份。继续吗？')) return;
-  await loadCloudState(user, '已拉取云端账本');
+  await loadCloudState(user, '已拉取云端账本', { silentMissing: false });
 }
 
 async function autoDownloadCloudStateIfEmpty() {
   if (!currentSession?.user || state.assets.length || state.records.length) return;
   if (autoCloudDownloadUserId === currentSession.user.id) return;
   autoCloudDownloadUserId = currentSession.user.id;
-  await loadCloudState(currentSession.user, '已自动拉取云端账本');
+  await loadCloudState(currentSession.user, '已自动拉取云端账本', { silentMissing: true });
 }
 
-async function loadCloudState(user, successMessage) {
+async function loadCloudState(user, successMessage, options = {}) {
   try {
     const { data, error } = await supabaseClient
       .from('app_states')
@@ -773,7 +843,10 @@ async function loadCloudState(user, successMessage) {
       .eq('user_id', user.id)
       .maybeSingle();
     if (error) throw error;
-    if (!data?.payload) return toast('云端还没有账本');
+    if (!data?.payload) {
+      if (!options.silentMissing) toast('云端还没有账本');
+      return false;
+    }
     const sync = structuredClone(state.settings.sync);
     state = normalizeState(data.payload);
     state.settings.sync = sync;
@@ -781,8 +854,10 @@ async function loadCloudState(user, successMessage) {
     saveState();
     toast(successMessage);
     render();
+    return true;
   } catch (error) {
     toast(`拉取失败：${error.message || '检查表结构/RLS'}`);
+    return false;
   }
 }
 
@@ -790,8 +865,10 @@ async function signOutCloud() {
   if (!supabaseClient) return;
   await supabaseClient.auth.signOut();
   currentSession = null;
+  localStorage.removeItem(OWNER_KEY);
+  resetLocalBookForAuth('');
   toast('已退出登录');
-  renderSync();
+  render();
 }
 
 async function requireCloudUser() {

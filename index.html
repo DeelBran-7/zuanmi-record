@@ -6,10 +6,26 @@
     <meta name="theme-color" content="#263f39">
     <title>赚米记录</title>
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=11">
+    <link rel="stylesheet" href="./styles.css?v=12">
   </head>
   <body>
-    <div class="app-shell">
+    <section class="auth-gate" id="authGate" hidden>
+      <div class="auth-card">
+        <p class="eyebrow">赚米记录</p>
+        <h1>先登录，再记账</h1>
+        <p class="small-muted">每个邮箱都是独立账本。登录后会自动同步你的云端记录。</p>
+        <div class="auth-fields">
+          <label>邮箱<input id="authEmailInput" type="email" autocomplete="email" placeholder="you@example.com"></label>
+          <label>验证码<input id="authOtpInput" inputmode="numeric" autocomplete="one-time-code" placeholder="邮件中的 6 位验证码"></label>
+        </div>
+        <div class="button-row">
+          <button class="primary-button" id="authSendButton" type="button">发送登录邮件</button>
+          <button class="ghost-button" id="authVerifyButton" type="button">输入验证码登录</button>
+        </div>
+      </div>
+    </section>
+
+    <div class="app-shell" id="appShell">
       <header class="topbar">
         <div>
           <p class="eyebrow">赚米记录</p>
@@ -152,7 +168,7 @@
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="./site-config.js?v=11"></script>
-    <script type="module" src="./app.js?v=11"></script>
+    <script src="./site-config.js?v=12"></script>
+    <script type="module" src="./app.js?v=12"></script>
   </body>
 </html>
