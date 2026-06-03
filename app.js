@@ -68,9 +68,7 @@ const elements = {
   appShell: document.querySelector('#appShell'),
   authGate: document.querySelector('#authGate'),
   authEmailInput: document.querySelector('#authEmailInput'),
-  authOtpInput: document.querySelector('#authOtpInput'),
   authSendButton: document.querySelector('#authSendButton'),
-  authVerifyButton: document.querySelector('#authVerifyButton'),
   yearStrip: document.querySelector('#yearStrip'),
   tabs: document.querySelectorAll('.tab-button'),
   views: {
@@ -99,7 +97,6 @@ function init() {
   document.querySelector('#quickRecordButton').addEventListener('click', openRecordDialog);
   document.querySelector('#exportButton').addEventListener('click', exportState);
   elements.authSendButton?.addEventListener('click', sendEmailOtp);
-  elements.authVerifyButton?.addEventListener('click', verifyEmailOtp);
   elements.tabs.forEach((button) => button.addEventListener('click', () => switchView(button.dataset.view)));
   elements.recordForm.addEventListener('submit', handleRecordSubmit);
   elements.assetForm.addEventListener('submit', handleAssetSubmit);
@@ -725,11 +722,9 @@ function renderCloudAuth(configured, signedIn) {
   return `
     <div class="settings-grid">
       <label>邮箱<input id="emailOtpInput" type="email" value="${escapeAttr(getSyncSettings().email || '')}" placeholder="you@example.com"></label>
-      <label>验证码<input id="otpInput" inputmode="numeric" placeholder="邮件中的 6 位验证码"></label>
     </div>
     <div class="button-row">
-      <button class="primary-button" data-action="send-email-otp">发送登录邮件</button>
-      <button class="ghost-button" data-action="verify-email-otp">输入验证码登录</button>
+      <button class="primary-button" data-action="send-email-otp">发送登录链接</button>
     </div>
   `;
 }
@@ -737,7 +732,7 @@ function renderCloudAuth(configured, signedIn) {
 function cloudStatusText(configured, signedIn) {
   if (!configured) return '需要先配置 Supabase 项目。';
   if (signedIn) return '已登录。上传会覆盖云端账本；拉取会覆盖本机账本，操作前可先导出备份。';
-  return '收到邮件后可以输入 6 位验证码；如果邮件里是登录链接，点击后回到本页也会保持登录。';
+  return '收到邮件后，点击里面的登录按钮回到本页即可。';
 }
 
 function getSyncSettings() {
@@ -760,7 +755,7 @@ async function sendEmailOtp() {
       },
     });
     if (error) throw error;
-    toast('登录邮件已发送');
+    toast('登录链接已发送，请查看邮箱');
   } catch (error) {
     toast(`发送失败：${error.message || '检查邮箱 Auth 配置'}`);
   }
@@ -794,7 +789,7 @@ function readAuthEmail() {
 }
 
 function readAuthToken() {
-  return (elements.authOtpInput?.value || document.querySelector('#otpInput')?.value || '').trim();
+  return (document.querySelector('#otpInput')?.value || '').trim();
 }
 
 function writeAuthEmail(email) {
@@ -1050,7 +1045,7 @@ function escapeAttr(value) {
 
 function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=8').then((registration) => {
+    navigator.serviceWorker.register('./sw.js?v=13').then((registration) => {
       registration.update().catch(() => {});
     }).catch(() => {});
   }
