@@ -724,7 +724,7 @@ function renderCloudAuth(configured, signedIn) {
       <label>邮箱<input id="emailOtpInput" type="email" value="${escapeAttr(getSyncSettings().email || '')}" placeholder="you@example.com"></label>
     </div>
     <div class="button-row">
-      <button class="primary-button" data-action="send-email-otp">发送登录链接</button>
+      <button class="primary-button" data-action="send-email-otp">发送登录邮件</button>
     </div>
   `;
 }
@@ -755,7 +755,7 @@ async function sendEmailOtp() {
       },
     });
     if (error) throw error;
-    toast('登录链接已发送，请查看邮箱');
+    toast('登录邮件已发送，请查看邮箱');
   } catch (error) {
     toast(`发送失败：${error.message || '检查邮箱 Auth 配置'}`);
   }
@@ -1045,7 +1045,7 @@ function escapeAttr(value) {
 
 function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=13').then((registration) => {
+    navigator.serviceWorker.register('./sw.js?v=15').then((registration) => {
       registration.update().catch(() => {});
     }).catch(() => {});
   }
