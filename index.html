@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#263f39">
+    <title>赚米记录</title>
+    <link rel="manifest" href="./manifest.webmanifest">
+    <link rel="stylesheet" href="./styles.css?v=8">
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">赚米记录</p>
+          <h1>资产总览</h1>
+        </div>
+        <div class="top-actions">
+          <button class="icon-button" id="exportButton" title="导出备份" aria-label="导出备份">↓</button>
+          <button class="primary-button" id="quickRecordButton">记一笔</button>
+        </div>
+      </header>
+
+      <main>
+        <section class="year-strip" aria-label="年份切换" id="yearStrip"></section>
+
+        <nav class="tabs" aria-label="主导航">
+          <button class="tab-button active" data-view="dashboard">总览</button>
+          <button class="tab-button" data-view="assets">资产</button>
+          <button class="tab-button" data-view="year">年度</button>
+          <button class="tab-button" data-view="records">记录</button>
+          <button class="tab-button" data-view="sync">同步</button>
+        </nav>
+
+        <section class="view active" id="dashboardView"></section>
+        <section class="view" id="assetsView"></section>
+        <section class="view" id="yearView"></section>
+        <section class="view" id="recordsView"></section>
+        <section class="view" id="syncView"></section>
+      </main>
+    </div>
+
+    <dialog id="recordDialog" class="modal">
+      <form method="dialog" class="modal-card" id="recordForm">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">新增记录</p>
+            <h2>记一笔</h2>
+          </div>
+          <button class="icon-button" type="button" data-close-dialog aria-label="关闭">×</button>
+        </div>
+        <label>资产项目<select name="assetId" required></select></label>
+        <label>记录类型<select name="type" required></select></label>
+        <div class="form-grid">
+          <label>金额<input name="amount" type="number" step="0.01" placeholder="例如 981"></label>
+          <label>日期<input name="date" type="date" required></label>
+        </div>
+        <div class="form-grid">
+          <label>克数<input name="quantity" type="number" step="0.01" placeholder="黄金可填"></label>
+          <label>备注<input name="note" placeholder="例如 分红已结算"></label>
+        </div>
+        <div class="modal-actions">
+          <button class="ghost-button" type="button" data-close-dialog>取消</button>
+          <button class="primary-button" value="default">保存</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="assetDialog" class="modal">
+      <form method="dialog" class="modal-card" id="assetForm">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">资产项目</p>
+            <h2>新增资产</h2>
+          </div>
+          <button class="icon-button" type="button" data-close-dialog aria-label="关闭">×</button>
+        </div>
+        <label>名称<input name="name" required placeholder="例如 新业务投资"></label>
+        <div class="form-grid">
+          <label>类型
+            <select name="category" required>
+              <option value="business">业务</option>
+              <option value="stock">股票</option>
+              <option value="gold">黄金</option>
+              <option value="cash">现金/工资</option>
+              <option value="other">其他</option>
+            </select>
+          </label>
+          <label>币种
+            <select name="currency" required>
+              <option value="CNY">人民币</option>
+              <option value="EUR">欧元</option>
+            </select>
+          </label>
+        </div>
+        <label>状态
+          <select name="status" required>
+            <option value="active">进行中</option>
+            <option value="paused">暂停</option>
+            <option value="archived">已归档</option>
+          </select>
+        </label>
+        <label>备注<input name="note" placeholder="可选"></label>
+        <div class="modal-actions">
+          <button class="ghost-button" type="button" data-close-dialog>取消</button>
+          <button class="primary-button" value="default">保存</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="assetDetailDialog" class="modal wide">
+      <article class="modal-card" id="assetDetail"></article>
+    </dialog>
+
+    <dialog id="importDialog" class="modal">
+      <form method="dialog" class="modal-card" id="importForm">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">导入</p>
+            <h2>恢复备份</h2>
+          </div>
+          <button class="icon-button" type="button" data-close-dialog aria-label="关闭">×</button>
+        </div>
+        <label>JSON 数据<textarea name="payload" rows="10" placeholder="粘贴导出的 JSON"></textarea></label>
+        <div class="modal-actions">
+          <button class="ghost-button" type="button" data-close-dialog>取消</button>
+          <button class="primary-button" value="default">导入</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="onboardingDialog" class="modal wide">
+      <form method="dialog" class="modal-card" id="onboardingForm">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">第一次使用</p>
+            <h2>创建你的资产账本</h2>
+            <p class="small-muted">默认不会包含任何人的真实数据。你可以从空账本开始，也可以载入一份演示模板看看效果。</p>
+          </div>
+        </div>
+        <div class="settings-grid">
+          <label>起始年份<input name="year" type="number" min="2000" max="2100" value="2026"></label>
+          <label>年度目标<input name="target" type="number" step="1" value="400000"></label>
+        </div>
+        <div class="modal-actions">
+          <button class="ghost-button" type="button" data-action="load-demo">载入演示模板</button>
+          <button class="primary-button" value="default">开始空账本</button>
+        </div>
+      </form>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script type="module" src="./app.js?v=8"></script>
+  </body>
+</html>

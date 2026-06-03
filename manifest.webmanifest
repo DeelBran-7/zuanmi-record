@@ -1,0 +1,15 @@
+{
+  "name": "赚米记录",
+  "short_name": "赚米记录",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f5f2eb",
+  "theme_color": "#263f39",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
