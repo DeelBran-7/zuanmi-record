@@ -326,7 +326,7 @@ function renderSync() {
       <div class="panel-header">
         <div>
           <h2>同步与备份</h2>
-          <p class="small-muted">本地可用；配置 Supabase 后可用邮箱验证码登录并多设备同步。</p>
+          <p class="small-muted">本地可用；接入云同步后可用邮箱登录并多设备同步。</p>
         </div>
       </div>
       <div class="settings-grid">
@@ -338,7 +338,7 @@ function renderSync() {
       <div class="panel cloud-panel">
         <div class="panel-header">
           <div>
-            <h3>邮箱验证码同步</h3>
+            <h3>邮箱登录同步</h3>
             <p class="small-muted">${cloudStatusText(configured, signedIn)}</p>
           </div>
         </div>
@@ -670,11 +670,11 @@ function renderCloudAuth(configured, signedIn) {
   return `
     <div class="settings-grid">
       <label>邮箱<input id="emailOtpInput" type="email" value="${escapeAttr(getSyncSettings().email || '')}" placeholder="you@example.com"></label>
-      <label>验证码<input id="otpInput" inputmode="numeric" placeholder="邮箱验证码"></label>
+      <label>验证码<input id="otpInput" inputmode="numeric" placeholder="邮件中的 6 位验证码"></label>
     </div>
     <div class="button-row">
-      <button class="primary-button" data-action="send-email-otp">发送验证码</button>
-      <button class="ghost-button" data-action="verify-email-otp">验证并登录</button>
+      <button class="primary-button" data-action="send-email-otp">发送登录邮件</button>
+      <button class="ghost-button" data-action="verify-email-otp">输入验证码登录</button>
     </div>
   `;
 }
@@ -682,7 +682,7 @@ function renderCloudAuth(configured, signedIn) {
 function cloudStatusText(configured, signedIn) {
   if (!configured) return '需要先配置 Supabase 项目。';
   if (signedIn) return '已登录。上传会覆盖云端账本；拉取会覆盖本机账本，操作前可先导出备份。';
-  return '邮箱验证码适合免费起步；登录后会长期保持，除非你退出或清缓存。';
+  return '收到邮件后可以输入 6 位验证码；如果邮件里是登录链接，点击后回到本页也会保持登录。';
 }
 
 function getSyncSettings() {
@@ -698,10 +698,13 @@ async function sendEmailOtp() {
     saveState();
     const { error } = await supabaseClient.auth.signInWithOtp({
       email,
-      options: { shouldCreateUser: true },
+      options: {
+        shouldCreateUser: true,
+        emailRedirectTo: window.location.href.split('#')[0],
+      },
     });
     if (error) throw error;
-    toast('验证码已发送');
+    toast('登录邮件已发送');
   } catch (error) {
     toast(`发送失败：${error.message || '检查邮箱 Auth 配置'}`);
   }
@@ -713,7 +716,7 @@ async function verifyEmailOtp() {
   const token = document.querySelector('#otpInput')?.value.trim();
   if (!email || !token) return toast('请输入邮箱和验证码');
   try {
-    const { data, error } = await supabaseClient.auth.verifyOtp({ email, token, type: 'email' });
+    const { data, error } = await supabaseClient.auth.verifyOtp({ email, token, type: 'magiclink' });
     if (error) throw error;
     state.settings.sync.email = email;
     saveState();
@@ -721,7 +724,7 @@ async function verifyEmailOtp() {
     toast('登录成功');
     render();
   } catch (error) {
-    toast(`验证失败：${error.message || '验证码不正确'}`);
+    toast(`验证失败：${error.message || '验证码或链接不正确'}`);
   }
 }
 
@@ -782,7 +785,7 @@ async function requireCloudUser() {
   }
   const { data, error } = await supabaseClient.auth.getUser();
   if (error || !data.user) {
-    toast('请先用邮箱验证码登录');
+    toast('请先用邮箱登录');
     return null;
   }
   return data.user;
