@@ -61,6 +61,7 @@ let state = loadState();
 let currentView = 'dashboard';
 let supabaseClient = null;
 let currentSession = null;
+let autoCloudDownloadUserId = null;
 
 const elements = {
   yearStrip: document.querySelector('#yearStrip'),
@@ -642,10 +643,14 @@ function initSupabaseClient() {
   supabaseClient.auth.getSession().then(({ data }) => {
     currentSession = data.session;
     renderSync();
+    autoDownloadCloudStateIfEmpty();
   }).catch(() => {});
   supabaseClient.auth.onAuthStateChange((event, session) => {
     currentSession = session;
-    window.setTimeout(() => renderSync(), 0);
+    window.setTimeout(() => {
+      renderSync();
+      autoDownloadCloudStateIfEmpty();
+    }, 0);
   });
 }
 
@@ -750,6 +755,17 @@ async function downloadCloudState() {
   const user = await requireCloudUser();
   if (!user) return;
   if (!window.confirm('拉取云端账本会覆盖本机账本。建议先导出备份。继续吗？')) return;
+  await loadCloudState(user, '已拉取云端账本');
+}
+
+async function autoDownloadCloudStateIfEmpty() {
+  if (!currentSession?.user || state.assets.length || state.records.length) return;
+  if (autoCloudDownloadUserId === currentSession.user.id) return;
+  autoCloudDownloadUserId = currentSession.user.id;
+  await loadCloudState(currentSession.user, '已自动拉取云端账本');
+}
+
+async function loadCloudState(user, successMessage) {
   try {
     const { data, error } = await supabaseClient
       .from('app_states')
@@ -763,7 +779,7 @@ async function downloadCloudState() {
     state.settings.sync = sync;
     state.settings.initialized = true;
     saveState();
-    toast('已拉取云端账本');
+    toast(successMessage);
     render();
   } catch (error) {
     toast(`拉取失败：${error.message || '检查表结构/RLS'}`);
