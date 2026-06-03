@@ -6,19 +6,21 @@
     <meta name="theme-color" content="#263f39">
     <title>赚米记录</title>
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=15">
+    <link rel="stylesheet" href="./styles.css?v=16">
   </head>
   <body>
     <section class="auth-gate" id="authGate" hidden>
       <div class="auth-card">
         <p class="eyebrow">赚米记录</p>
         <h1>先登录，再记账</h1>
-        <p class="small-muted">每个邮箱都是独立账本。输入邮箱后，点击邮件里的登录按钮即可进入。</p>
+        <p class="small-muted">每个邮箱都是独立账本。第一次用邮箱和密码注册，以后直接登录。</p>
         <div class="auth-fields">
           <label>邮箱<input id="authEmailInput" type="email" autocomplete="email" placeholder="you@example.com"></label>
+          <label>密码<input id="authPasswordInput" type="password" autocomplete="current-password" placeholder="至少 6 位"></label>
         </div>
         <div class="button-row">
-          <button class="primary-button" id="authSendButton" type="button">发送登录邮件</button>
+          <button class="primary-button" id="authSignInButton" type="button">登录</button>
+          <button class="ghost-button" id="authSignUpButton" type="button">注册</button>
         </div>
       </div>
     </section>
@@ -166,7 +168,7 @@
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="./site-config.js?v=15"></script>
-    <script type="module" src="./app.js?v=15"></script>
+    <script src="./site-config.js?v=16"></script>
+    <script type="module" src="./app.js?v=16"></script>
   </body>
 </html>

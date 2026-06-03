@@ -68,7 +68,9 @@ const elements = {
   appShell: document.querySelector('#appShell'),
   authGate: document.querySelector('#authGate'),
   authEmailInput: document.querySelector('#authEmailInput'),
-  authSendButton: document.querySelector('#authSendButton'),
+  authPasswordInput: document.querySelector('#authPasswordInput'),
+  authSignInButton: document.querySelector('#authSignInButton'),
+  authSignUpButton: document.querySelector('#authSignUpButton'),
   yearStrip: document.querySelector('#yearStrip'),
   tabs: document.querySelectorAll('.tab-button'),
   views: {
@@ -96,7 +98,8 @@ init();
 function init() {
   document.querySelector('#quickRecordButton').addEventListener('click', openRecordDialog);
   document.querySelector('#exportButton').addEventListener('click', exportState);
-  elements.authSendButton?.addEventListener('click', sendEmailOtp);
+  elements.authSignInButton?.addEventListener('click', signInWithPassword);
+  elements.authSignUpButton?.addEventListener('click', signUpWithPassword);
   elements.tabs.forEach((button) => button.addEventListener('click', () => switchView(button.dataset.view)));
   elements.recordForm.addEventListener('submit', handleRecordSubmit);
   elements.assetForm.addEventListener('submit', handleAssetSubmit);
@@ -583,8 +586,9 @@ function bindCommonActions(root) {
       if (action === 'close-detail') elements.assetDetailDialog.close();
       if (action === 'save-settings') saveSettings();
       if (action === 'fetch-gold') fetchGoldPrice();
-      if (action === 'send-email-otp') sendEmailOtp();
-      if (action === 'verify-email-otp') verifyEmailOtp();
+      if (action === 'sign-in-password') signInWithPassword();
+      if (action === 'sign-up-password') signUpWithPassword();
+      if (action === 'update-password') updatePassword();
       if (action === 'sync-upload') uploadCloudState();
       if (action === 'sync-download') downloadCloudState();
       if (action === 'sign-out') signOutCloud();
@@ -712,9 +716,13 @@ function renderCloudAuth(configured, signedIn) {
         <strong>${escapeHtml(email)}</strong>
         <span class="status-pill">已绑定</span>
       </div>
+      <div class="settings-grid">
+        <label>新密码<input id="newPasswordInput" type="password" autocomplete="new-password" placeholder="至少 6 位"></label>
+      </div>
       <div class="button-row">
         <button class="primary-button" data-action="sync-upload">上传本机账本</button>
         <button class="ghost-button" data-action="sync-download">拉取云端账本</button>
+        <button class="ghost-button" data-action="update-password">修改密码</button>
         <button class="ghost-button" data-action="sign-out">退出登录</button>
       </div>
     `;
@@ -722,9 +730,11 @@ function renderCloudAuth(configured, signedIn) {
   return `
     <div class="settings-grid">
       <label>邮箱<input id="emailOtpInput" type="email" value="${escapeAttr(getSyncSettings().email || '')}" placeholder="you@example.com"></label>
+      <label>密码<input id="passwordInput" type="password" autocomplete="current-password" placeholder="至少 6 位"></label>
     </div>
     <div class="button-row">
-      <button class="primary-button" data-action="send-email-otp">发送登录邮件</button>
+      <button class="primary-button" data-action="sign-in-password">登录</button>
+      <button class="ghost-button" data-action="sign-up-password">注册</button>
     </div>
   `;
 }
@@ -732,42 +742,20 @@ function renderCloudAuth(configured, signedIn) {
 function cloudStatusText(configured, signedIn) {
   if (!configured) return '需要先配置 Supabase 项目。';
   if (signedIn) return '已登录。上传会覆盖云端账本；拉取会覆盖本机账本，操作前可先导出备份。';
-  return '收到邮件后，点击里面的登录按钮回到本页即可。';
+  return '邮箱和密码登录，不消耗邮件额度。第一次使用先注册。';
 }
 
 function getSyncSettings() {
   return resolveSyncSettings(state.settings.sync, publicSyncConfig);
 }
 
-async function sendEmailOtp() {
+async function signInWithPassword() {
   if (!supabaseClient) return toast('请先保存 Supabase 配置');
   const email = readAuthEmail();
-  if (!email) return toast('请输入邮箱');
+  const password = readAuthPassword();
+  if (!email || !password) return toast('请输入邮箱和密码');
   try {
-    state.settings.sync.email = email;
-    writeAuthEmail(email);
-    saveState();
-    const { error } = await supabaseClient.auth.signInWithOtp({
-      email,
-      options: {
-        shouldCreateUser: true,
-        emailRedirectTo: window.location.href.split('#')[0],
-      },
-    });
-    if (error) throw error;
-    toast('登录邮件已发送，请查看邮箱');
-  } catch (error) {
-    toast(`发送失败：${error.message || '检查邮箱 Auth 配置'}`);
-  }
-}
-
-async function verifyEmailOtp() {
-  if (!supabaseClient) return toast('请先保存 Supabase 配置');
-  const email = readAuthEmail();
-  const token = readAuthToken();
-  if (!email || !token) return toast('请输入邮箱和验证码');
-  try {
-    const { data, error } = await supabaseClient.auth.verifyOtp({ email, token, type: 'magiclink' });
+    const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
     if (error) throw error;
     state.settings.sync.email = email;
     saveState();
@@ -780,7 +768,31 @@ async function verifyEmailOtp() {
     render();
     showOnboardingIfNeeded();
   } catch (error) {
-    toast(`验证失败：${error.message || '验证码或链接不正确'}`);
+    toast(`登录失败：${error.message || '检查邮箱或密码'}`);
+  }
+}
+
+async function signUpWithPassword() {
+  if (!supabaseClient) return toast('请先保存 Supabase 配置');
+  const email = readAuthEmail();
+  const password = readAuthPassword();
+  if (!email || !password) return toast('请输入邮箱和密码');
+  if (password.length < 6) return toast('密码至少 6 位');
+  try {
+    const { data, error } = await supabaseClient.auth.signUp({ email, password });
+    if (error) throw error;
+    state.settings.sync.email = email;
+    saveState();
+    currentSession = data.session;
+    if (data.session?.user) {
+      prepareLocalStateForCloudUser(data.session.user);
+      await autoDownloadCloudStateIfEmpty();
+    }
+    toast(data.session ? '注册成功' : '注册成功，请登录');
+    render();
+    showOnboardingIfNeeded();
+  } catch (error) {
+    toast(`注册失败：${error.message || '检查邮箱或密码'}`);
   }
 }
 
@@ -788,14 +800,28 @@ function readAuthEmail() {
   return normalizeEmail(elements.authEmailInput?.value || document.querySelector('#emailOtpInput')?.value || state.settings.sync.email);
 }
 
-function readAuthToken() {
-  return (document.querySelector('#otpInput')?.value || '').trim();
+function readAuthPassword() {
+  return (elements.authPasswordInput?.value || document.querySelector('#passwordInput')?.value || '').trim();
 }
 
 function writeAuthEmail(email) {
   if (elements.authEmailInput) elements.authEmailInput.value = email;
   const syncEmailInput = document.querySelector('#emailOtpInput');
   if (syncEmailInput) syncEmailInput.value = email;
+}
+
+async function updatePassword() {
+  if (!supabaseClient || !currentSession?.user) return toast('请先登录');
+  const password = document.querySelector('#newPasswordInput')?.value.trim();
+  if (!password || password.length < 6) return toast('新密码至少 6 位');
+  try {
+    const { error } = await supabaseClient.auth.updateUser({ password });
+    if (error) throw error;
+    document.querySelector('#newPasswordInput').value = '';
+    toast('密码已更新');
+  } catch (error) {
+    toast(`修改失败：${error.message || '请稍后再试'}`);
+  }
 }
 
 async function uploadCloudState() {
@@ -1045,7 +1071,7 @@ function escapeAttr(value) {
 
 function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=15').then((registration) => {
+    navigator.serviceWorker.register('./sw.js?v=16').then((registration) => {
       registration.update().catch(() => {});
     }).catch(() => {});
   }
