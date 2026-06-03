@@ -827,6 +827,10 @@ async function updatePassword() {
 async function uploadCloudState() {
   const user = await requireCloudUser();
   if (!user) return;
+  if (!state.assets.length && !state.records.length) {
+    toast('本机账本为空，已阻止覆盖云端');
+    return;
+  }
   try {
     const { error } = await supabaseClient
       .from('app_states')
