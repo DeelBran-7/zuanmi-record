@@ -7,10 +7,12 @@ import {
   formatPercent,
   recordsUntilYear,
 } from './finance.js';
+import { getBrowserPublicSyncConfig, normalizeEmail, resolveSyncSettings } from './sync-config.js';
 
 const STORAGE_KEY = 'zuanmi-record-state-v2';
 const TROY_OUNCE_GRAMS = 31.1034768;
 const today = new Date().toISOString().slice(0, 10);
+const publicSyncConfig = getBrowserPublicSyncConfig();
 
 const defaultState = {
   settings: {
@@ -120,8 +122,9 @@ function loadState() {
 }
 
 function normalizeState(input) {
+  const settings = { ...structuredClone(defaultState.settings), ...(input.settings || {}) };
   return {
-    settings: { ...structuredClone(defaultState.settings), ...(input.settings || {}) },
+    settings: { ...settings, sync: resolveSyncSettings(settings.sync, publicSyncConfig) },
     assets: Array.isArray(input.assets) ? input.assets : [],
     records: Array.isArray(input.records) ? input.records : [],
   };
@@ -305,9 +308,19 @@ function renderRecords() {
 }
 
 function renderSync() {
-  const sync = state.settings.sync;
+  const sync = getSyncSettings();
   const configured = Boolean(sync.supabaseUrl && sync.anonKey);
   const signedIn = Boolean(currentSession?.user);
+  const technicalFields = sync.usesPublicConfig ? `
+        <div class="sync-ready">
+          <strong>云同步已接入</strong>
+          <span>你和朋友只需要用自己的邮箱登录，账本会自动按账号分开。</span>
+        </div>
+      ` : `
+        <label>Supabase URL<input id="supabaseUrl" value="${escapeAttr(sync.supabaseUrl)}" placeholder="https://xxxx.supabase.co"></label>
+        <label>Anon Key<input id="anonKey" value="${escapeAttr(sync.anonKey)}" placeholder="ey..."></label>
+        <label>登录邮箱<input id="syncEmail" value="${escapeAttr(sync.email)}" placeholder="you@example.com"></label>
+      `;
   elements.views.sync.innerHTML = `
     <section class="panel">
       <div class="panel-header">
@@ -317,9 +330,7 @@ function renderSync() {
         </div>
       </div>
       <div class="settings-grid">
-        <label>Supabase URL<input id="supabaseUrl" value="${escapeAttr(sync.supabaseUrl)}" placeholder="https://xxxx.supabase.co"></label>
-        <label>Anon Key<input id="anonKey" value="${escapeAttr(sync.anonKey)}" placeholder="ey..."></label>
-        <label>登录邮箱<input id="syncEmail" value="${escapeAttr(sync.email)}" placeholder="you@example.com"></label>
+        ${technicalFields}
         <label>当前金价 / 克<input id="goldPrice" type="number" step="0.01" value="${state.settings.goldPricePerGram || ''}" placeholder="例如 980"></label>
         <label>当前年份目标<input id="yearTarget" type="number" step="1" value="${getTarget() || ''}" placeholder="例如 400000"></label>
       </div>
@@ -602,9 +613,13 @@ function toggleArchive(assetId) {
 }
 
 function saveSettings() {
-  state.settings.sync.supabaseUrl = document.querySelector('#supabaseUrl').value.trim();
-  state.settings.sync.anonKey = document.querySelector('#anonKey').value.trim();
-  state.settings.sync.email = document.querySelector('#syncEmail').value.trim();
+  if (publicSyncConfig.configured) {
+    state.settings.sync = getSyncSettings();
+  } else {
+    state.settings.sync.supabaseUrl = document.querySelector('#supabaseUrl')?.value.trim() || '';
+    state.settings.sync.anonKey = document.querySelector('#anonKey')?.value.trim() || '';
+    state.settings.sync.email = normalizeEmail(document.querySelector('#syncEmail')?.value || state.settings.sync.email);
+  }
   state.settings.goldPricePerGram = Number(document.querySelector('#goldPrice').value) || 0;
   state.settings.targets[state.settings.selectedYear] = Number(document.querySelector('#yearTarget').value) || 0;
   saveState();
@@ -614,6 +629,7 @@ function saveSettings() {
 }
 
 function initSupabaseClient() {
+  state.settings.sync = getSyncSettings();
   const { supabaseUrl, anonKey } = state.settings.sync;
   if (!supabaseUrl || !anonKey || !window.supabase?.createClient) {
     supabaseClient = null;
@@ -653,7 +669,7 @@ function renderCloudAuth(configured, signedIn) {
   }
   return `
     <div class="settings-grid">
-      <label>邮箱<input id="emailOtpInput" type="email" value="${escapeAttr(state.settings.sync.email || '')}" placeholder="you@example.com"></label>
+      <label>邮箱<input id="emailOtpInput" type="email" value="${escapeAttr(getSyncSettings().email || '')}" placeholder="you@example.com"></label>
       <label>验证码<input id="otpInput" inputmode="numeric" placeholder="邮箱验证码"></label>
     </div>
     <div class="button-row">
@@ -669,9 +685,13 @@ function cloudStatusText(configured, signedIn) {
   return '邮箱验证码适合免费起步；登录后会长期保持，除非你退出或清缓存。';
 }
 
+function getSyncSettings() {
+  return resolveSyncSettings(state.settings.sync, publicSyncConfig);
+}
+
 async function sendEmailOtp() {
   if (!supabaseClient) return toast('请先保存 Supabase 配置');
-  const email = document.querySelector('#emailOtpInput')?.value.trim();
+  const email = normalizeEmail(document.querySelector('#emailOtpInput')?.value);
   if (!email) return toast('请输入邮箱');
   try {
     state.settings.sync.email = email;
@@ -689,7 +709,7 @@ async function sendEmailOtp() {
 
 async function verifyEmailOtp() {
   if (!supabaseClient) return toast('请先保存 Supabase 配置');
-  const email = document.querySelector('#emailOtpInput')?.value.trim();
+  const email = normalizeEmail(document.querySelector('#emailOtpInput')?.value);
   const token = document.querySelector('#otpInput')?.value.trim();
   if (!email || !token) return toast('请输入邮箱和验证码');
   try {

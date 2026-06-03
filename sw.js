@@ -1,10 +1,12 @@
-const CACHE_NAME = 'zuanmi-record-v8';
+const CACHE_NAME = 'zuanmi-record-v9';
 const ASSETS = [
   './',
   './index.html',
   './styles.css',
   './app.js',
   './finance.js',
+  './sync-config.js',
+  './site-config.js',
   './manifest.webmanifest',
   './icon.svg',
 ];
