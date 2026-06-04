@@ -115,6 +115,39 @@ export function calculatePortfolioSummary(assets, records, options = {}) {
   };
 }
 
+export function sortAssetsForDisplay(assets) {
+  return [...assets].sort((a, b) => {
+    const statusRankA = a.status === 'archived' ? 1 : 0;
+    const statusRankB = b.status === 'archived' ? 1 : 0;
+    if (statusRankA !== statusRankB) return statusRankA - statusRankB;
+    const orderA = Number.isFinite(Number(a.displayOrder)) ? Number(a.displayOrder) : Number.MAX_SAFE_INTEGER;
+    const orderB = Number.isFinite(Number(b.displayOrder)) ? Number(b.displayOrder) : Number.MAX_SAFE_INTEGER;
+    if (orderA !== orderB) return orderA - orderB;
+    return String(a.name || '').localeCompare(String(b.name || ''), 'zh-CN');
+  });
+}
+
+export function normalizeAssetOrder(assets) {
+  return sortAssetsForDisplay(assets).map((asset, index) => ({ ...asset, displayOrder: index }));
+}
+
+export function moveAssetWithinStatus(assets, assetId, direction) {
+  const normalized = normalizeAssetOrder(assets);
+  const target = normalized.find((asset) => asset.id === assetId);
+  if (!target) return normalized;
+  const groupStatus = target.status === 'archived' ? 'archived' : 'active';
+  const group = normalized.filter((asset) => (asset.status === 'archived' ? 'archived' : 'active') === groupStatus);
+  const currentIndex = group.findIndex((asset) => asset.id === assetId);
+  const nextIndex = currentIndex + Math.sign(direction);
+  if (currentIndex < 0 || nextIndex < 0 || nextIndex >= group.length) return normalized;
+  [group[currentIndex], group[nextIndex]] = [group[nextIndex], group[currentIndex]];
+  const reordered = normalized.map((asset) => {
+    const replacement = group.shift();
+    return (asset.status === 'archived' ? 'archived' : 'active') === groupStatus ? replacement : asset;
+  });
+  return reordered.map((asset, index) => ({ ...asset, displayOrder: index }));
+}
+
 export function calculateYearSummary(assets, records, options = {}) {
   const year = Number(options.year);
   const yearRecords = recordsForYear(records, year);

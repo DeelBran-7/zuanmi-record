@@ -5,6 +5,8 @@ import {
   calculatePortfolioSummary,
   calculateYearSummary,
   getGoldSummary,
+  moveAssetWithinStatus,
+  sortAssetsForDisplay,
 } from './finance.js';
 
 const assets = [
@@ -88,4 +90,31 @@ test('year summary carries forward prior assets without counting them as yearly 
   assert.equal(summary.netContribution, 0);
   assert.equal(summary.realizedProfit, 1000);
   assert.equal(summary.months[1].assets, 91000);
+});
+
+test('asset display order keeps active and archived assets in separate ordered groups', () => {
+  const orderedAssets = sortAssetsForDisplay([
+    { id: 'archived-old', status: 'archived', displayOrder: 1 },
+    { id: 'active-later', status: 'active', displayOrder: 20 },
+    { id: 'active-first', status: 'active', displayOrder: 10 },
+    { id: 'archived-new', status: 'archived', displayOrder: 2 },
+  ]);
+
+  assert.deepEqual(orderedAssets.map((asset) => asset.id), [
+    'active-first',
+    'active-later',
+    'archived-old',
+    'archived-new',
+  ]);
+});
+
+test('moving an asset only reorders assets in the same status group', () => {
+  const moved = moveAssetWithinStatus([
+    { id: 'a', status: 'active', displayOrder: 0 },
+    { id: 'b', status: 'active', displayOrder: 1 },
+    { id: 'c', status: 'archived', displayOrder: 2 },
+  ], 'b', -1);
+
+  assert.deepEqual(moved.map((asset) => asset.id), ['b', 'a', 'c']);
+  assert.deepEqual(moved.map((asset) => asset.displayOrder), [0, 1, 2]);
 });

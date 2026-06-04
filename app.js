@@ -5,7 +5,10 @@ import {
   calculateYearSummary,
   formatCurrency,
   formatPercent,
+  moveAssetWithinStatus,
+  normalizeAssetOrder,
   recordsUntilYear,
+  sortAssetsForDisplay,
 } from './finance.js';
 import { getBrowserPublicSyncConfig, normalizeEmail, resolveSyncSettings } from './sync-config.js';
 
@@ -63,6 +66,8 @@ let currentView = 'dashboard';
 let supabaseClient = null;
 let currentSession = null;
 let autoCloudDownloadUserId = null;
+let reorderAssetId = null;
+let longPressTimer = null;
 
 const elements = {
   appShell: document.querySelector('#appShell'),
@@ -133,7 +138,7 @@ function normalizeState(input) {
   const settings = { ...structuredClone(defaultState.settings), ...(input.settings || {}) };
   return {
     settings: { ...settings, sync: resolveSyncSettings(settings.sync, publicSyncConfig) },
-    assets: Array.isArray(input.assets) ? input.assets : [],
+    assets: Array.isArray(input.assets) ? normalizeAssetOrder(input.assets) : [],
     records: Array.isArray(input.records) ? input.records : [],
   };
 }
@@ -257,20 +262,34 @@ function renderDashboard() {
 }
 
 function renderAssets() {
-  const summaries = state.assets.map((asset) => calculateAssetSummary(asset, state.records, {
+  const orderedAssets = sortAssetsForDisplay(state.assets);
+  const summaries = orderedAssets.map((asset) => calculateAssetSummary(asset, state.records, {
     goldPricePerGram: state.settings.goldPricePerGram,
   }));
+  const activeSummaries = summaries.filter((asset) => asset.status !== 'archived');
+  const archivedSummaries = summaries.filter((asset) => asset.status === 'archived');
   elements.views.assets.innerHTML = `
     <section class="panel">
       <div class="panel-header">
         <div>
           <h2>资产管理</h2>
-          <p class="small-muted">新增资产、暂停、归档和恢复。归档不会删除历史。</p>
+          <p class="small-muted">长按资产可调整顺序。归档资产会收进下方归档区，历史记录仍保留。</p>
         </div>
         <button class="primary-button" data-action="new-asset">新增资产</button>
       </div>
       <div class="asset-list">
-        ${summaries.map(renderAssetCard).join('')}
+        ${activeSummaries.map(renderAssetCard).join('') || empty('还没有进行中的资产')}
+      </div>
+    </section>
+    <section class="panel archive-panel">
+      <div class="panel-header">
+        <div>
+          <h2>归档资产</h2>
+          <p class="small-muted">已经结束或暂时不看的资产会在这里，点进去可以恢复。</p>
+        </div>
+      </div>
+      <div class="asset-list">
+        ${archivedSummaries.map(renderAssetCard).join('') || empty('还没有归档资产')}
       </div>
     </section>
   `;
@@ -370,19 +389,28 @@ function renderSync() {
 function renderAssetCard(assetSummary) {
   const asset = state.assets.find((item) => item.id === assetSummary.assetId) || assetSummary;
   const pillClass = asset.status === 'archived' ? 'archived' : asset.status === 'paused' ? 'paused' : '';
+  const isReordering = reorderAssetId === assetSummary.assetId;
   return `
-    <button class="asset-card" data-action="asset-detail" data-asset-id="${assetSummary.assetId}">
+    <article class="asset-card ${isReordering ? 'reordering' : ''}" data-action="asset-detail" data-asset-id="${assetSummary.assetId}" tabindex="0" role="button" aria-label="${escapeAttr(assetSummary.name)} 详情">
       <div>
         <strong>${escapeHtml(assetSummary.name)}</strong>
         <div class="asset-meta">${categoryLabel(asset.category)} · ${asset.currency} · <span class="status-pill ${pillClass}">${statusLabel(asset.status)}</span></div>
         <div class="asset-meta">${escapeHtml(asset.note || '')}</div>
+        <div class="asset-meta reorder-hint">${isReordering ? '排序模式' : '长按调整顺序'}</div>
       </div>
       <div class="asset-values">
         <strong>${formatCurrency(assetSummary.currentValue, asset.currency)}</strong>
         <div class="asset-meta">本金 ${formatCurrency(assetSummary.principal, asset.currency)}</div>
         <div class="${assetSummary.netRealized >= 0 ? 'profit' : 'loss'}">${signedCurrency(assetSummary.netRealized, asset.currency)}</div>
       </div>
-    </button>
+      ${isReordering ? `
+        <div class="reorder-controls">
+          <button class="ghost-button" data-action="move-asset-up" data-asset-id="${assetSummary.assetId}">上移</button>
+          <button class="ghost-button" data-action="move-asset-down" data-asset-id="${assetSummary.assetId}">下移</button>
+          <button class="primary-button" data-action="finish-reorder">完成</button>
+        </div>
+      ` : ''}
+    </article>
   `;
 }
 
@@ -519,7 +547,9 @@ function handleAssetSubmit(event) {
     currency: form.get('currency'),
     status: form.get('status'),
     note: form.get('note').trim(),
+    displayOrder: nextAssetDisplayOrder(),
   });
+  state.assets = normalizeAssetOrder(state.assets);
   saveState();
   elements.assetDialog.close();
   toast('已新增资产');
@@ -536,7 +566,7 @@ function handleImportSubmit(event) {
     }
     state = {
       settings: { ...structuredClone(defaultState.settings), ...(imported.settings || {}), initialized: true },
-      assets: imported.assets,
+      assets: normalizeAssetOrder(imported.assets),
       records: imported.records,
     };
     saveState();
@@ -564,7 +594,7 @@ function handleOnboardingSubmit(event) {
 }
 
 function loadDemoData() {
-  state = structuredClone(demoState);
+  state = normalizeState(demoState);
   saveState();
   elements.onboardingDialog.close();
   toast('已载入演示模板');
@@ -573,8 +603,10 @@ function loadDemoData() {
 
 function bindCommonActions(root) {
   root.querySelectorAll('[data-action]').forEach((element) => {
-    element.addEventListener('click', () => {
+    element.addEventListener('click', (event) => {
       const action = element.dataset.action;
+      if (action === 'asset-detail' && event.target.closest('.reorder-controls')) return;
+      if (action !== 'asset-detail') event.stopPropagation();
       if (action === 'new-record') openRecordDialog();
       if (action === 'new-record-for-asset') openRecordDialog(element.dataset.assetId);
       if (action === 'new-asset') elements.assetDialog.showModal();
@@ -583,6 +615,9 @@ function bindCommonActions(root) {
       if (action === 'records-view') switchView('records');
       if (action === 'delete-record') deleteRecord(element.dataset.recordId);
       if (action === 'toggle-archive') toggleArchive(element.dataset.assetId);
+      if (action === 'move-asset-up') moveAssetOrder(element.dataset.assetId, -1);
+      if (action === 'move-asset-down') moveAssetOrder(element.dataset.assetId, 1);
+      if (action === 'finish-reorder') finishAssetReorder();
       if (action === 'close-detail') elements.assetDetailDialog.close();
       if (action === 'save-settings') saveSettings();
       if (action === 'fetch-gold') fetchGoldPrice();
@@ -597,7 +632,15 @@ function bindCommonActions(root) {
       if (action === 'demo') loadDemoData();
       if (action === 'reset') resetState();
     });
+    if (element.dataset.action === 'asset-detail') {
+      element.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        renderAssetDetail(element.dataset.assetId);
+      });
+    }
   });
+  bindLongPressReorder(root);
 }
 
 function switchView(view) {
@@ -617,9 +660,45 @@ function toggleArchive(assetId) {
   const asset = state.assets.find((item) => item.id === assetId);
   if (!asset) return;
   asset.status = asset.status === 'archived' ? 'active' : 'archived';
+  state.assets = normalizeAssetOrder(state.assets);
   saveState();
   elements.assetDetailDialog.close();
   toast(asset.status === 'archived' ? '资产已归档' : '资产已恢复');
+  render();
+}
+
+function bindLongPressReorder(root) {
+  root.querySelectorAll('.asset-card[data-asset-id]').forEach((card) => {
+    const clearTimer = () => {
+      if (longPressTimer) window.clearTimeout(longPressTimer);
+      longPressTimer = null;
+    };
+    card.addEventListener('pointerdown', (event) => {
+      if (event.target.closest('button')) return;
+      clearTimer();
+      longPressTimer = window.setTimeout(() => enterAssetReorder(card.dataset.assetId), 520);
+    });
+    card.addEventListener('pointerup', clearTimer);
+    card.addEventListener('pointerleave', clearTimer);
+    card.addEventListener('pointercancel', clearTimer);
+  });
+}
+
+function enterAssetReorder(assetId) {
+  reorderAssetId = assetId;
+  toast('排序模式：用上移/下移调整位置');
+  render();
+}
+
+function finishAssetReorder() {
+  reorderAssetId = null;
+  render();
+}
+
+function moveAssetOrder(assetId, direction) {
+  state.assets = moveAssetWithinStatus(state.assets, assetId, direction);
+  reorderAssetId = assetId;
+  saveState();
   render();
 }
 
@@ -976,7 +1055,7 @@ function resetState() {
 }
 
 function getPortfolio() {
-  return calculatePortfolioSummary(state.assets, recordsUntilYear(state.records, state.settings.selectedYear), {
+  return calculatePortfolioSummary(sortAssetsForDisplay(state.assets), recordsUntilYear(state.records, state.settings.selectedYear), {
     year: state.settings.selectedYear,
     target: getTarget(),
     goldPricePerGram: state.settings.goldPricePerGram,
@@ -993,6 +1072,10 @@ function getYear() {
 
 function getTarget() {
   return Number(state.settings.targets[state.settings.selectedYear]) || 0;
+}
+
+function nextAssetDisplayOrder() {
+  return state.assets.reduce((max, asset) => Math.max(max, Number(asset.displayOrder) || 0), -1) + 1;
 }
 
 function getKnownYears() {
@@ -1075,7 +1158,7 @@ function escapeAttr(value) {
 
 function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=16').then((registration) => {
+    navigator.serviceWorker.register('./sw.js?v=17').then((registration) => {
       registration.update().catch(() => {});
     }).catch(() => {});
   }
