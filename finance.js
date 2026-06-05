@@ -61,10 +61,10 @@ export function calculateAssetSummary(asset, records, options = {}) {
   let floatingProfit = null;
 
   if (asset.category === 'gold') {
-    currentValue = gold.currentValue;
+    currentValue = money(gold.currentValue - spent);
     floatingProfit = gold.floatingProfit;
   } else if (latestValuation !== null) {
-    currentValue = money(latestValuation);
+    currentValue = money(latestValuation - spent);
   } else {
     currentValue = money(capitalIn - capitalOut + grossRevenue - realizedLoss - spent);
   }

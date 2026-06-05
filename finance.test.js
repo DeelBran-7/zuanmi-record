@@ -161,3 +161,20 @@ test('year summary separates gross revenue, spending, and retained profit', () =
   assert.equal(summary.months[2].grossRevenue, 10000);
   assert.equal(summary.months[2].spent, 3000);
 });
+
+test('spending is deducted from gold and valuation based current assets', () => {
+  const summary = calculatePortfolioSummary([
+    { id: 'gold', name: '黄金', category: 'gold', currency: 'CNY', status: 'active' },
+    { id: 'valuation', name: '估值项目', category: 'business', currency: 'CNY', status: 'active' },
+  ], [
+    { id: 'gold-buy', assetId: 'gold', type: 'gold_buy', amount: 2000, quantity: 2, date: '2026-01-01' },
+    { id: 'gold-spent', assetId: 'gold', type: 'expense', amount: 100, date: '2026-01-02' },
+    { id: 'valuation-now', assetId: 'valuation', type: 'valuation', amount: 5000, date: '2026-01-03' },
+    { id: 'valuation-spent', assetId: 'valuation', type: 'expense', amount: 300, date: '2026-01-04' },
+  ], { year: 2026, target: 400000, goldPricePerGram: 1000 });
+
+  assert.equal(summary.assets.find((asset) => asset.assetId === 'gold').currentValue, 1900);
+  assert.equal(summary.assets.find((asset) => asset.assetId === 'valuation').currentValue, 4700);
+  assert.equal(summary.spent, 400);
+  assert.equal(summary.totalAssets, 6600);
+});

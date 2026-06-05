@@ -139,11 +139,27 @@ function loadState() {
 
 function normalizeState(input) {
   const settings = { ...structuredClone(defaultState.settings), ...(input.settings || {}) };
+  const records = Array.isArray(input.records) ? normalizeRecords(input.records) : [];
   return {
     settings: { ...settings, sync: resolveSyncSettings(settings.sync, publicSyncConfig) },
     assets: Array.isArray(input.assets) ? normalizeAssetOrder(input.assets) : [],
-    records: Array.isArray(input.records) ? input.records : [],
+    records,
   };
+}
+
+function normalizeRecords(records) {
+  return records.map((record) => {
+    if (
+      record.id === 'rec-gold-13'
+      && record.assetId === 'asset-gold'
+      && record.type === 'gold_buy'
+      && Number(record.quantity) === 2
+      && Number(record.amount) === 981
+    ) {
+      return { ...record, amount: 1981.59, note: '黄金买入 2g，按工行截图校准' };
+    }
+    return record;
+  });
 }
 
 function saveState() {
@@ -392,9 +408,14 @@ function renderAssetCard(assetSummary) {
   const isReordering = reorderAssetId === assetSummary.assetId;
   return `
     <article class="asset-card ${isReordering ? 'reordering' : ''}" data-action="asset-detail" data-asset-id="${assetSummary.assetId}" tabindex="0" role="button" aria-label="${escapeAttr(assetSummary.name)} 详情">
-      <div>
-        <strong>${escapeHtml(assetSummary.name)}</strong>
-        <div class="asset-meta">${categoryLabel(asset.category)} · ${asset.currency} · <span class="status-pill ${pillClass}">${statusLabel(asset.status)}</span></div>
+      <div class="asset-identity">
+        <span class="asset-icon ${asset.category}">${categoryIcon(asset.category)}</span>
+        <div>
+          <strong>${escapeHtml(assetSummary.name)}</strong>
+          <div class="asset-meta">${categoryLabel(asset.category)} · ${asset.currency} · <span class="status-pill ${pillClass}">${statusLabel(asset.status)}</span></div>
+        </div>
+      </div>
+      <div class="asset-note">
         <div class="asset-meta">${escapeHtml(asset.note || '')}</div>
         <div class="asset-meta reorder-hint">${isReordering ? '排序模式' : '长按调整顺序'}</div>
       </div>
@@ -418,14 +439,15 @@ function renderRecordRow(record) {
   const asset = state.assets.find((item) => item.id === record.assetId);
   const type = RECORD_TYPES[record.type]?.label || record.type;
   const amount = record.type === 'note' ? escapeHtml(record.note || '') : signedByType(record, asset?.currency);
+  const tone = recordTone(record.type);
   return `
     <div class="record-row">
       <div>
         <strong>${escapeHtml(asset?.name || '未知资产')}</strong>
         <div class="record-meta">${record.date}</div>
       </div>
-      <div>${type}</div>
-      <div>${amount}</div>
+      <div><span class="record-type-chip">${type}</span></div>
+      <div class="record-amount ${tone}">${amount}</div>
       <button class="ghost-button" data-action="delete-record" data-record-id="${record.id}">删除</button>
     </div>
   `;
@@ -455,9 +477,11 @@ function renderAssetDetail(assetId) {
       <h3>黄金估值</h3>
       <div class="detail-grid">
         ${metric('持有克数', `${summary.gold.grams}g`)}
+        ${metric('市价/克', summary.gold.currentPrice ? `${summary.gold.currentPrice}/g` : '待金价')}
         ${metric('总成本', formatCurrency(summary.gold.cost))}
         ${metric('平均买入', `${Math.round(summary.gold.averageBuyPrice * 100) / 100}/g`)}
         ${metric('黄金浮盈', summary.gold.floatingProfit === null ? '待金价' : signedCurrency(summary.gold.floatingProfit), summary.gold.floatingProfit >= 0 ? 'profit' : 'loss')}
+        ${metric('盈亏比', summary.gold.floatingProfit === null || !summary.gold.cost ? '待金价' : formatPercent((summary.gold.floatingProfit / summary.gold.cost) * 100), summary.gold.floatingProfit >= 0 ? 'profit' : 'loss')}
       </div>
     </section>
   ` : '';
@@ -493,7 +517,7 @@ function renderAssetDetail(assetId) {
     <section class="panel">
       <div class="panel-header">
         <h3>记录明细</h3>
-        <div class="button-row">
+        <div class="button-row detail-actions">
           <button class="ghost-button" data-action="toggle-archive" data-asset-id="${asset.id}">${asset.status === 'archived' ? '恢复' : '归档'}</button>
           <button class="ghost-button danger-button" data-action="delete-asset" data-asset-id="${asset.id}">删除资产</button>
           <button class="primary-button" data-action="new-record-for-asset" data-asset-id="${asset.id}">新增记录</button>
@@ -1204,6 +1228,22 @@ function categoryLabel(category) {
   }[category] || category;
 }
 
+function categoryIcon(category) {
+  return {
+    business: '业',
+    stock: '股',
+    gold: '金',
+    cash: '现',
+    other: '其',
+  }[category] || '资';
+}
+
+function recordTone(type) {
+  if (['realized_profit', 'dividend'].includes(type)) return 'profit';
+  if (['realized_loss', 'expense', 'fee'].includes(type)) return 'loss';
+  return '';
+}
+
 function statusLabel(status) {
   return {
     active: '进行中',
@@ -1233,7 +1273,7 @@ function escapeAttr(value) {
 
 function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=22').then((registration) => {
+    navigator.serviceWorker.register('./sw.js?v=23').then((registration) => {
       registration.update().catch(() => {});
     }).catch(() => {});
   }
