@@ -107,6 +107,60 @@ export function calculateAssetSummary(asset, records, options = {}) {
   };
 }
 
+export function buildAssetAnalytics(records) {
+  const sortedRecords = [...records].sort((a, b) => new Date(a.date) - new Date(b.date));
+  const financialRecords = sortedRecords.filter((record) => recordSignedNet(record) !== 0);
+  const total = createFlowBucket();
+  const monthMap = new Map();
+  const yearMap = new Map();
+  const typeMap = new Map();
+
+  sortedRecords.forEach((record) => {
+    const date = new Date(record.date);
+    if (Number.isNaN(date.getTime())) return;
+    const monthKey = record.date.slice(0, 7);
+    const yearKey = String(date.getFullYear());
+    const typeConfig = RECORD_TYPES[record.type] || { label: record.type, sign: 0 };
+    const amount = Math.abs(Number(record.amount) || 0);
+
+    addRecordToFlow(total, record);
+    if (!monthMap.has(monthKey)) monthMap.set(monthKey, createFlowBucket(monthKey));
+    if (!yearMap.has(yearKey)) yearMap.set(yearKey, createFlowBucket(yearKey));
+    addRecordToFlow(monthMap.get(monthKey), record);
+    addRecordToFlow(yearMap.get(yearKey), record);
+
+    if (!typeMap.has(record.type)) {
+      typeMap.set(record.type, {
+        type: record.type,
+        label: typeConfig.label,
+        sign: typeConfig.sign || 0,
+        amount: 0,
+        count: 0,
+      });
+    }
+    const typeTotal = typeMap.get(record.type);
+    typeTotal.amount = money(typeTotal.amount + amount);
+    typeTotal.count += 1;
+  });
+
+  const months = fillMonthGaps(monthMap);
+  const years = [...yearMap.values()].sort((a, b) => Number(b.label) - Number(a.label));
+  const typeTotals = [...typeMap.values()]
+    .filter((item) => item.amount > 0 || item.count > 0)
+    .sort((a, b) => b.amount - a.amount || b.count - a.count);
+  const firstDate = sortedRecords[0]?.date;
+  const lastDate = sortedRecords.at(-1)?.date;
+
+  return {
+    total,
+    months,
+    years,
+    typeTotals,
+    dateRange: firstDate && lastDate ? `${firstDate} 至 ${lastDate}` : '暂无记录',
+    financialRecordCount: financialRecords.length,
+  };
+}
+
 export function calculatePortfolioSummary(assets, records, options = {}) {
   const assetSummaries = assets.map((asset) => calculateAssetSummary(asset, records, options));
   const settledCash = money(assetSummaries.reduce((sum, asset) => sum + cnyAmount(asset.settledCash, asset.currency), 0));
@@ -238,6 +292,53 @@ function findLatestAmount(records, type) {
     .filter((record) => record.type === type && record.amount !== undefined)
     .sort((a, b) => new Date(b.date) - new Date(a.date));
   return matches.length ? Number(matches[0].amount) : null;
+}
+
+function createFlowBucket(label = '') {
+  return {
+    label,
+    count: 0,
+    capitalIn: 0,
+    capitalOut: 0,
+    income: 0,
+    loss: 0,
+    expense: 0,
+    net: 0,
+  };
+}
+
+function addRecordToFlow(bucket, record) {
+  const amount = Math.abs(Number(record.amount) || 0);
+  bucket.count += 1;
+  if (record.type === 'capital_in' || record.type === 'gold_buy') bucket.capitalIn = money(bucket.capitalIn + amount);
+  if (record.type === 'capital_out') bucket.capitalOut = money(bucket.capitalOut + amount);
+  if (record.type === 'realized_profit' || record.type === 'dividend') bucket.income = money(bucket.income + amount);
+  if (record.type === 'realized_loss' || record.type === 'fee') bucket.loss = money(bucket.loss + amount);
+  if (record.type === 'expense') bucket.expense = money(bucket.expense + amount);
+  bucket.net = money(bucket.net + recordSignedNet(record));
+}
+
+function fillMonthGaps(monthMap) {
+  const keys = [...monthMap.keys()].sort();
+  if (!keys.length) return [];
+  const [startYear, startMonth] = keys[0].split('-').map(Number);
+  const [endYear, endMonth] = keys.at(-1).split('-').map(Number);
+  const cursor = new Date(startYear, startMonth - 1, 1);
+  const end = new Date(endYear, endMonth - 1, 1);
+  const months = [];
+  while (cursor <= end) {
+    const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`;
+    months.push(monthMap.get(key) || createFlowBucket(key));
+    cursor.setMonth(cursor.getMonth() + 1);
+  }
+  return months;
+}
+
+function recordSignedNet(record) {
+  const sign = RECORD_TYPES[record.type]?.sign || 0;
+  if (!sign) return 0;
+  const amount = Math.abs(Number(record.amount) || 0);
+  return money(sign < 0 ? -amount : amount);
 }
 
 function cnyAmount(value, currency) {

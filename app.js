@@ -1,10 +1,12 @@
 import {
   RECORD_TYPES,
   calculateAssetSummary,
+  buildAssetAnalytics,
   calculatePortfolioSummary,
   calculateYearSummary,
   formatCurrency,
   formatPercent,
+  money,
   moveAssetWithinStatus,
   normalizeAssetOrder,
   recordsUntilYear,
@@ -511,6 +513,7 @@ function renderAssetDetail(assetId) {
     goldPricePerGram: state.settings.goldPricePerGram,
   });
   const records = state.records.filter((record) => record.assetId === assetId).sort((a, b) => new Date(b.date) - new Date(a.date));
+  const insightHtml = renderAssetInsights(asset, summary, records);
   const goldHtml = summary.gold ? `
     <section class="panel">
       <h3>黄金估值</h3>
@@ -552,6 +555,7 @@ function renderAssetDetail(assetId) {
       ${metric('已花掉', formatCurrency(summary.spent, asset.currency), summary.spent > 0 ? 'loss' : '')}
       ${metric(summary.assetClass === 'investment' ? '账户收益率' : '现金流率', summary.principal ? formatPercent(((summary.assetClass === 'investment' ? summary.investmentProfit : summary.retainedRevenue) / summary.principal) * 100) : '0%')}
     </div>
+    ${insightHtml}
     ${goldHtml}
     <section class="panel">
       <div class="panel-header">
@@ -567,6 +571,155 @@ function renderAssetDetail(assetId) {
   `;
   bindCommonActions(elements.assetDetail);
   elements.assetDetailDialog.showModal();
+}
+
+function renderAssetInsights(asset, summary, records) {
+  const analytics = buildAssetAnalytics(records);
+  const profitLabel = summary.assetClass === 'investment' ? '账户净变化' : '现金流净变化';
+  return `
+    <section class="panel asset-insight-panel">
+      <div class="panel-header">
+        <div>
+          <h3>收入分析</h3>
+          <p class="small-muted">先看汇总和趋势，再按需翻下面的原始明细。</p>
+        </div>
+        <span class="asset-count">${records.length}</span>
+      </div>
+      <div class="insight-grid">
+        ${metric(profitLabel, signedCurrency(analytics.total.net, asset.currency), analytics.total.net >= 0 ? 'profit' : 'loss')}
+        ${metric(summary.assetClass === 'investment' ? '账户内收入' : '累计收入', formatCurrency(analytics.total.income, asset.currency))}
+        ${metric('累计支出/亏损', formatCurrency(analytics.total.loss + analytics.total.expense, asset.currency), analytics.total.loss + analytics.total.expense > 0 ? 'loss' : '')}
+        ${metric('记录跨度', analytics.dateRange)}
+      </div>
+      <div class="analysis-layout">
+        <div class="analysis-card trend-card">
+          <div class="analysis-card-header">
+            <strong>按月累计趋势</strong>
+            <span>${analytics.months.length ? `${analytics.months.length} 个月` : '暂无数据'}</span>
+          </div>
+          ${renderTrendChart(analytics.months, asset.currency)}
+        </div>
+        <div class="analysis-card">
+          <div class="analysis-card-header">
+            <strong>类型占比</strong>
+            <span>${analytics.typeTotals.length} 类</span>
+          </div>
+          ${renderTypeBreakdown(analytics.typeTotals, asset.currency)}
+        </div>
+      </div>
+      <div class="analysis-layout lower">
+        <div class="analysis-card">
+          <div class="analysis-card-header">
+            <strong>近 12 个月</strong>
+            <span>月度汇总</span>
+          </div>
+          ${renderMonthlyBreakdown(analytics.months.slice(-12), asset.currency)}
+        </div>
+        <div class="analysis-card">
+          <div class="analysis-card-header">
+            <strong>年度汇总</strong>
+            <span>${analytics.years.length} 年</span>
+          </div>
+          ${renderYearBreakdown(analytics.years, asset.currency)}
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function renderTrendChart(months, currency) {
+  if (!months.length) return empty('还没有可分析的收入记录');
+  let cumulative = 0;
+  const series = months.map((month) => {
+    cumulative = money(cumulative + month.net);
+    return { label: month.label, value: cumulative, net: month.net };
+  });
+  const values = series.map((item) => item.value).concat(0);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max === min ? 1 : max - min;
+  const width = 360;
+  const height = 132;
+  const padding = 18;
+  const chartPoints = series.map((item, index) => {
+    const x = series.length === 1 ? width / 2 : padding + index * ((width - padding * 2) / (series.length - 1));
+    const y = height - padding - ((item.value - min) / range) * (height - padding * 2);
+    return { ...item, x: money(x), y: money(y) };
+  });
+  const points = chartPoints.map((item) => `${item.x},${item.y}`).join(' ');
+  const zeroY = height - padding - ((0 - min) / range) * (height - padding * 2);
+  const last = series.at(-1);
+  return `
+    <div class="chart-wrap">
+      <svg class="trend-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="按月累计趋势">
+        <line x1="${padding}" y1="${money(zeroY)}" x2="${width - padding}" y2="${money(zeroY)}" class="chart-zero"></line>
+        <polyline points="${points}" class="chart-line"></polyline>
+        ${chartPoints.map((item) => `<circle cx="${item.x}" cy="${item.y}" r="3.4" class="chart-dot"><title>${item.label} ${formatCurrency(item.value, currency)}</title></circle>`).join('')}
+      </svg>
+      <div class="chart-summary">
+        <span>累计 ${signedCurrency(last.value, currency)}</span>
+        <span>最近 ${last.label} ${signedCurrency(last.net, currency)}</span>
+      </div>
+    </div>
+  `;
+}
+
+function renderTypeBreakdown(typeTotals, currency) {
+  if (!typeTotals.length) return empty('还没有类型统计');
+  const max = Math.max(...typeTotals.map((item) => item.amount), 1);
+  return `
+    <div class="bar-list">
+      ${typeTotals.map((item) => {
+        const width = Math.max((item.amount / max) * 100, item.amount > 0 ? 8 : 2);
+        const tone = item.sign < 0 ? 'loss' : item.sign > 0 ? 'profit' : '';
+        return `
+          <div class="bar-row">
+            <div class="bar-row-top">
+              <span>${item.label}</span>
+              <strong class="${tone}">${item.amount ? formatCurrency(item.amount, currency) : `${item.count} 条`}</strong>
+            </div>
+            <div class="bar-track"><span class="${tone}" style="width: ${width}%"></span></div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+function renderMonthlyBreakdown(months, currency) {
+  if (!months.length) return empty('还没有月度记录');
+  return `
+    <div class="summary-list">
+      ${[...months].reverse().map((month) => renderFlowSummaryRow(month.label, month, currency)).join('')}
+    </div>
+  `;
+}
+
+function renderYearBreakdown(years, currency) {
+  if (!years.length) return empty('还没有年度记录');
+  return `
+    <div class="summary-list">
+      ${years.map((year) => renderFlowSummaryRow(`${year.label}年`, year, currency)).join('')}
+    </div>
+  `;
+}
+
+function renderFlowSummaryRow(label, bucket, currency) {
+  const totalCost = money(bucket.loss + bucket.expense);
+  return `
+    <div class="flow-row">
+      <div>
+        <strong>${label}</strong>
+        <span>${bucket.count} 条</span>
+      </div>
+      <div>
+        <span>投入 ${formatCurrency(bucket.capitalIn, currency)}</span>
+        <span>收入 ${formatCurrency(bucket.income, currency)}</span>
+        <span class="${totalCost > 0 ? 'loss' : ''}">支出 ${formatCurrency(totalCost, currency)}</span>
+      </div>
+      <strong class="${bucket.net >= 0 ? 'profit' : 'loss'}">${signedCurrency(bucket.net, currency)}</strong>
+    </div>
+  `;
 }
 
 function populateRecordForm(assetId = '') {
@@ -1343,7 +1496,7 @@ function escapeAttr(value) {
 
 function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=27').then((registration) => {
+    navigator.serviceWorker.register('./sw.js?v=28').then((registration) => {
       registration.update().catch(() => {});
     }).catch(() => {});
   }

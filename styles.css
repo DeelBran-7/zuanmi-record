@@ -750,6 +750,153 @@ textarea {
   gap: 10px;
 }
 
+.asset-insight-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.insight-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr));
+  gap: 10px;
+}
+
+.analysis-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(260px, 0.85fr);
+  gap: 10px;
+}
+
+.analysis-layout.lower {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.analysis-card {
+  min-width: 0;
+  padding: 13px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(248, 251, 250, 0.92)),
+    rgba(255, 255, 255, 0.94);
+  box-shadow: 0 10px 28px rgba(16, 24, 40, 0.045);
+}
+
+.analysis-card-header,
+.chart-summary,
+.bar-row-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.analysis-card-header {
+  margin-bottom: 10px;
+}
+
+.analysis-card-header span,
+.chart-summary,
+.flow-row span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.chart-wrap {
+  display: grid;
+  gap: 8px;
+}
+
+.trend-chart {
+  width: 100%;
+  min-height: 132px;
+  overflow: visible;
+}
+
+.chart-zero {
+  stroke: rgba(16, 24, 40, 0.16);
+  stroke-dasharray: 5 5;
+}
+
+.chart-line {
+  fill: none;
+  stroke: var(--green-2);
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 8px 10px rgba(22, 130, 83, 0.16));
+}
+
+.chart-dot {
+  fill: var(--gold);
+  stroke: var(--green);
+  stroke-width: 1.6;
+}
+
+.bar-list,
+.summary-list {
+  display: grid;
+  gap: 10px;
+}
+
+.bar-row {
+  display: grid;
+  gap: 6px;
+}
+
+.bar-row-top span {
+  color: #344054;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.bar-row-top strong {
+  font-size: 13px;
+}
+
+.bar-track {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(16, 24, 40, 0.07);
+}
+
+.bar-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--green), var(--green-2));
+}
+
+.bar-track span.profit {
+  background: linear-gradient(90deg, var(--green-2), var(--gold));
+}
+
+.bar-track span.loss {
+  background: linear-gradient(90deg, #f97066, var(--loss));
+}
+
+.flow-row {
+  display: grid;
+  grid-template-columns: minmax(76px, 0.7fr) minmax(0, 1.5fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.68);
+}
+
+.flow-row > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.flow-row > strong {
+  white-space: nowrap;
+}
+
 .sync-ready {
   display: flex;
   min-height: 58px;
@@ -811,12 +958,15 @@ textarea {
   }
 
   .metric-grid,
-  .detail-grid {
+  .detail-grid,
+  .analysis-layout,
+  .analysis-layout.lower {
     grid-template-columns: 1fr;
   }
 
   .record-row,
-  .month-row {
+  .month-row,
+  .flow-row {
     grid-template-columns: 1fr;
   }
 

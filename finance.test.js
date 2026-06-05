@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   calculateAssetSummary,
+  buildAssetAnalytics,
   calculatePortfolioSummary,
   calculateYearSummary,
   getGoldSummary,
@@ -202,4 +203,28 @@ test('cashflow income settles into cash while investment gains stay inside accou
   assert.equal(summary.grossRevenue, 10000);
   assert.equal(summary.investmentProfit, 31550);
   assert.equal(summary.totalAssets, 228550);
+});
+
+test('asset analytics aggregates records by month, year, and type', () => {
+  const analytics = buildAssetAnalytics([
+    { id: 'a', assetId: 'business', type: 'capital_in', amount: 100000, date: '2025-12-20' },
+    { id: 'b', assetId: 'business', type: 'dividend', amount: 10000, date: '2026-01-01' },
+    { id: 'c', assetId: 'business', type: 'expense', amount: 3000, date: '2026-01-08' },
+    { id: 'd', assetId: 'business', type: 'realized_loss', amount: 2000, date: '2026-03-03' },
+    { id: 'e', assetId: 'business', type: 'note', amount: 0, date: '2026-03-04' },
+  ]);
+
+  assert.equal(analytics.total.capitalIn, 100000);
+  assert.equal(analytics.total.income, 10000);
+  assert.equal(analytics.total.loss, 2000);
+  assert.equal(analytics.total.expense, 3000);
+  assert.equal(analytics.total.net, 105000);
+  assert.equal(analytics.financialRecordCount, 4);
+  assert.equal(analytics.months.length, 4);
+  assert.deepEqual(analytics.months.map((month) => month.label), ['2025-12', '2026-01', '2026-02', '2026-03']);
+  assert.equal(analytics.months[2].net, 0);
+  assert.deepEqual(analytics.years.map((year) => year.label), ['2026', '2025']);
+  assert.equal(analytics.years[0].net, 5000);
+  assert.equal(analytics.typeTotals.find((item) => item.type === 'dividend').amount, 10000);
+  assert.equal(analytics.typeTotals.find((item) => item.type === 'note').count, 1);
 });
