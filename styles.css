@@ -738,6 +738,36 @@ h3 {
   box-shadow: 0 0 0 2px rgba(201, 255, 61, 0.24);
 }
 
+.cash-pool-card {
+  cursor: default;
+  border-color: rgba(201, 255, 61, 0.34);
+  background:
+    radial-gradient(circle at 92% 12%, rgba(201, 255, 61, 0.22), transparent 24%),
+    linear-gradient(135deg, rgba(16, 16, 16, 0.96), rgba(28, 32, 25, 0.94));
+  color: white;
+  box-shadow:
+    0 18px 42px rgba(16, 24, 40, 0.16),
+    inset 0 -1px 0 rgba(201, 255, 61, 0.32);
+}
+
+.cash-pool-card .asset-meta {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.cash-pool-card .asset-values strong,
+.cash-pool-card .profit {
+  color: var(--gold);
+}
+
+.cash-pool-card:hover,
+.cash-pool-card:focus-visible {
+  transform: none;
+  border-color: rgba(201, 255, 61, 0.48);
+  box-shadow:
+    0 18px 42px rgba(16, 24, 40, 0.16),
+    inset 0 -1px 0 rgba(201, 255, 61, 0.32);
+}
+
 .reorder-hint {
   margin-top: 6px;
 }

@@ -257,6 +257,7 @@ function renderDashboard() {
 
         <div class="metric-grid">
           ${metric('总营收', formatCurrency(summary.grossRevenue))}
+          ${metric('当前存款', formatCurrency(summary.currentCash), summary.currentCash >= 0 ? 'profit' : 'loss')}
           ${metric('已花掉', formatCurrency(summary.spent), summary.spent > 0 ? 'loss' : '')}
           ${metric('投资盈亏', signedCurrency(summary.investmentProfit), summary.investmentProfit >= 0 ? 'profit' : 'loss')}
         </div>
@@ -310,6 +311,7 @@ function renderDashboard() {
 }
 
 function renderAssets() {
+  const portfolio = getPortfolio();
   const orderedAssets = sortAssetsForDisplay(state.assets);
   const summaries = orderedAssets.map((asset) => calculateAssetSummary(asset, state.records, {
     goldPricePerGram: state.settings.goldPricePerGram,
@@ -330,7 +332,7 @@ function renderAssets() {
       </div>
       ${renderAssetGroup('实体 / 现金流资产', '分红、工资、汇率差和业务回款会进入总营收或现金流。', cashflowSummaries, '还没有实体或现金流资产')}
       ${renderAssetGroup('投资账户资产', '股票、黄金、基金、Crypto 的账户内收益进入投资盈亏，不混入总营收。', investmentSummaries, '还没有投资账户资产')}
-      ${renderAssetGroup('当前存款 / 收入账户', '工资、存款和备用金归在这里，用来承接实体项目留下来的钱。', cashSummaries, '还没有当前存款或收入账户')}
+      ${renderCashGroup(portfolio, cashSummaries)}
     </section>
     <section class="panel archive-panel">
       <div class="panel-header">
@@ -345,6 +347,47 @@ function renderAssets() {
     </section>
   `;
   bindCommonActions(elements.views.assets);
+}
+
+function renderCashGroup(portfolio, cashSummaries) {
+  return `
+    <div class="asset-group">
+      <div class="asset-group-header">
+        <div>
+          <h3>当前存款 / 现金池</h3>
+          <p class="small-muted">实体收入、分红和消费会自动汇总到现金池；银行卡、钱包余额可以另建现金账户。</p>
+        </div>
+        <span class="asset-count">${cashSummaries.length + 1}</span>
+      </div>
+      <div class="asset-list">
+        ${renderCashPoolCard(portfolio)}
+        ${cashSummaries.map(renderAssetCard).join('') || empty('还没有手动现金账户，可先只用上面的自动现金池')}
+      </div>
+    </div>
+  `;
+}
+
+function renderCashPoolCard(portfolio) {
+  return `
+    <article class="asset-card cash-pool-card" aria-label="当前存款自动现金池">
+      <div class="asset-identity">
+        <span class="asset-icon cash">现</span>
+        <div>
+          <strong>当前存款（自动现金池）</strong>
+          <div class="asset-meta">收入先进来，消费从这里扣</div>
+        </div>
+      </div>
+      <div class="asset-note">
+        <div class="asset-meta">自动现金池 ${formatCurrency(portfolio.settledCash)} · 手动现金账户 ${formatCurrency(portfolio.cashAssetsValue)}</div>
+        <div class="asset-meta">总营收保留历史，当前存款只代表现在还剩的现金。</div>
+      </div>
+      <div class="asset-values">
+        <strong>${formatCurrency(portfolio.currentCash)}</strong>
+        <div class="asset-meta">现金池合计</div>
+        <div class="${portfolio.currentCash >= 0 ? 'profit' : 'loss'}">可用现金 ${signedCurrency(portfolio.currentCash)}</div>
+      </div>
+    </article>
+  `;
 }
 
 function renderAssetGroup(title, description, summaries, emptyText) {
@@ -376,6 +419,7 @@ function renderYear() {
       </div>
       <div class="metric-grid">
         ${metric('目前资产', formatCurrency(summary.totalAssets))}
+        ${metric('当前存款', formatCurrency(summary.currentCash), summary.currentCash >= 0 ? 'profit' : 'loss')}
         ${metric('总营收', formatCurrency(summary.grossRevenue))}
         ${metric('已花掉', formatCurrency(summary.spent), summary.spent > 0 ? 'loss' : '')}
         ${metric('投资盈亏', signedCurrency(summary.investmentProfit), summary.investmentProfit >= 0 ? 'profit' : 'loss')}
@@ -467,9 +511,9 @@ function renderHelp() {
         </div>
       </div>
       <div class="help-grid">
-        ${helpCard('1', '先建资产', '在“资产”里新增项目。实体项目、股票黄金、当前存款要分开建，这样总营收和投资盈亏不会混在一起。')}
-        ${helpCard('2', '再记流水', '点“记一笔”记录投入、分红、亏损、消费、黄金买入或当前估值。所有汇总数字都来自这些记录。')}
-        ${helpCard('3', '看总览', '“总览”看目前资产、目标进度、总营收、已花掉和投资盈亏，适合每天快速看一眼。')}
+        ${helpCard('1', '先建资产', '在“资产”里新增项目。实体项目、股票黄金、当前存款要分开建，现金池会自动承接实体收入和消费。')}
+        ${helpCard('2', '再记流水', '实体项目记分红/盈利会进入当前存款；记花掉/消费会从当前存款扣。股票黄金收益默认留在账户里。')}
+        ${helpCard('3', '看总览', '“总览”看目前资产、当前存款、目标进度、总营收、已花掉和投资盈亏，适合每天快速看一眼。')}
         ${helpCard('4', '看年度', '“年度”按年份回看。点“+ 年份”可以新增 2028、2029 或之后的目标。')}
         ${helpCard('5', '看资产详情', '点进每个资产，可以看按月趋势、年度汇总、类型占比和原始记录，记录很多也不用一条条翻。')}
         ${helpCard('6', '同步备份', '登录同一个邮箱可以多设备同步。大改数据前建议先在“同步”里导出 JSON 备份。')}
@@ -483,9 +527,11 @@ function renderHelp() {
         </div>
       </div>
       <div class="rule-list">
-        ${ruleRow('总营收', '只看实体/现金流类资产赚了多少钱，不把股票、黄金账户里的内部收益混进去。')}
-        ${ruleRow('目前资产', '等于各资产当前价值，加上已经结算留下来的现金，再扣掉花掉/消费。')}
-        ${ruleRow('投资账户', '股票、黄金、基金、Crypto 的收益留在账户里，只有你记录取出/回款时才体现为取出。')}
+        ${ruleRow('总营收', '历史上一共赚到过多少钱。实体分红、工资、副业、汇率差会加总营收；消费不会把总营收抹掉。')}
+        ${ruleRow('当前存款', '实体项目的盈利/分红默认进自动现金池，花掉/消费默认从现金池扣；你也可以另建银行卡、钱包等现金账户。')}
+        ${ruleRow('目前资产', '等于实体项目当前价值、投资账户价值、黄金市值和当前存款加在一起，是你现在还剩多少资产。')}
+        ${ruleRow('资金流向', '一笔钱应该能看出从哪里来、去了哪里：收入进存款，消费扣存款，投资账户内收益留在账户里。')}
+        ${ruleRow('投资账户', '股票、黄金、基金、Crypto 单独计算，收益默认留在账户里，只有你记录取出/回款时才离开账户。')}
         ${ruleRow('黄金浮盈', '黄金会按买入克数、成本和当前金价计算浮盈；股票不自动看浮亏，需要你手动记。')}
         ${ruleRow('归档资产', '归档只代表项目结束或暂时不看，历史资金仍然参与总资产计算。')}
       </div>
@@ -626,6 +672,7 @@ function renderAssetDetail(assetId) {
       ${metric('回款/取出', formatCurrency(summary.capitalOut, asset.currency))}
       ${metric(summary.assetClass === 'investment' ? '账户内收益' : '总营收', formatCurrency(summary.grossRevenue, asset.currency))}
       ${metric('已花掉', formatCurrency(summary.spent, asset.currency), summary.spent > 0 ? 'loss' : '')}
+      ${summary.assetClass === 'cashflow' ? metric('已入当前存款', formatCurrency(summary.settledCash, asset.currency), summary.settledCash >= 0 ? 'profit' : 'loss') : ''}
       ${metric(summary.assetClass === 'investment' ? '账户收益率' : '现金流率', summary.principal ? formatPercent(((summary.assetClass === 'investment' ? summary.investmentProfit : summary.retainedRevenue) / summary.principal) * 100) : '0%')}
     </div>
     ${insightHtml}
@@ -1611,7 +1658,7 @@ function escapeAttr(value) {
 
 function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=33').then((registration) => {
+    navigator.serviceWorker.register('./sw.js?v=34').then((registration) => {
       registration.update().catch(() => {});
     }).catch(() => {});
   }

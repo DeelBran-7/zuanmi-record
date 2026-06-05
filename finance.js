@@ -164,6 +164,10 @@ export function buildAssetAnalytics(records) {
 export function calculatePortfolioSummary(assets, records, options = {}) {
   const assetSummaries = assets.map((asset) => calculateAssetSummary(asset, records, options));
   const settledCash = money(assetSummaries.reduce((sum, asset) => sum + cnyAmount(asset.settledCash, asset.currency), 0));
+  const cashAssetsValue = money(assetSummaries
+    .filter((asset) => asset.assetClass === 'cash')
+    .reduce((sum, asset) => sum + cnyAmount(asset.currentValue, asset.currency), 0));
+  const currentCash = money(settledCash + cashAssetsValue);
   const totalAssets = money(assetSummaries.reduce((sum, asset) => sum + cnyAmount(asset.currentValue, asset.currency), settledCash));
   const principal = money(assetSummaries.reduce((sum, asset) => sum + cnyAmount(asset.principal, asset.currency), 0));
   const cashFlowAssets = assetSummaries.filter((asset) => asset.assetClass !== 'investment');
@@ -189,6 +193,8 @@ export function calculatePortfolioSummary(assets, records, options = {}) {
     realizedProfit,
     spent,
     settledCash,
+    cashAssetsValue,
+    currentCash,
     investmentProfit,
     goldFloatingProfit,
     trueProfit: money(cashFlowProfit - spent + investmentProfit),

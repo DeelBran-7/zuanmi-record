@@ -145,7 +145,25 @@ test('spending revenue reduces current assets but not gross revenue', () => {
   assert.equal(summary.totalAssets, 107000);
   assert.equal(summary.grossRevenue, 10000);
   assert.equal(summary.spent, 3000);
+  assert.equal(summary.settledCash, 7000);
+  assert.equal(summary.currentCash, 7000);
   assert.equal(summary.trueProfit, 7000);
+});
+
+test('spent dividends keep revenue history but leave no current cash', () => {
+  const summary = calculatePortfolioSummary([
+    { id: 'train', name: '小火车', category: 'business', currency: 'CNY', status: 'active' },
+  ], [
+    { id: 'capital', assetId: 'train', type: 'capital_in', amount: 100000, date: '2026-01-01' },
+    { id: 'dividend', assetId: 'train', type: 'dividend', amount: 10000, date: '2026-02-01' },
+    { id: 'spent', assetId: 'train', type: 'expense', amount: 10000, date: '2026-02-02' },
+  ], { year: 2026, target: 400000, goldPricePerGram: 0 });
+
+  assert.equal(summary.grossRevenue, 10000);
+  assert.equal(summary.spent, 10000);
+  assert.equal(summary.settledCash, 0);
+  assert.equal(summary.currentCash, 0);
+  assert.equal(summary.totalAssets, 100000);
 });
 
 test('year summary separates gross revenue, spending, and retained profit', () => {
