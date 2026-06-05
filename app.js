@@ -205,12 +205,6 @@ function renderDashboard() {
           </div>
         </article>
 
-        <section class="insight-strip" aria-label="数据口径">
-          <span>归档仍计入资产</span>
-          <span>营收和现有资金分开</span>
-          <span>消费会减少目前资产</span>
-        </section>
-
         <div class="metric-grid">
           ${metric('总营收', formatCurrency(summary.grossRevenue))}
           ${metric('已花掉', formatCurrency(summary.spent), summary.spent > 0 ? 'loss' : '')}
@@ -1223,7 +1217,7 @@ function escapeAttr(value) {
 
 function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=19').then((registration) => {
+    navigator.serviceWorker.register('./sw.js?v=20').then((registration) => {
       registration.update().catch(() => {});
     }).catch(() => {});
   }

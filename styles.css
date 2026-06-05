@@ -278,28 +278,6 @@ h3 {
   margin: 12px 0;
 }
 
-.insight-strip {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
-  gap: 8px;
-  margin: 12px 0 0;
-}
-
-.insight-strip span {
-  min-height: 38px;
-  border: 1px solid rgba(37, 99, 235, 0.16);
-  border-radius: 8px;
-  background: #ffffff;
-  color: var(--blue);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 8px 10px;
-  font-size: 13px;
-  font-weight: 700;
-  text-align: center;
-}
-
 .metric-card {
   padding: 13px;
 }
