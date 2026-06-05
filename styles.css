@@ -8,7 +8,7 @@
   --line: #e2e8f0;
   --line-soft: #edf1f5;
   --green: #101828;
-  --green-2: #2563eb;
+  --green-2: #168253;
   --cyan: #06b6d4;
   --profit: #168253;
   --loss: #d92d20;
@@ -160,11 +160,11 @@ h3 {
 }
 
 .primary-button {
-  background: linear-gradient(135deg, var(--blue), var(--cyan));
-  border-color: rgba(37, 99, 235, 0.42);
+  background: linear-gradient(135deg, #101828 0%, #113c36 58%, var(--green-2) 100%);
+  border-color: rgba(22, 130, 83, 0.42);
   color: white;
   font-weight: 700;
-  box-shadow: 0 12px 24px rgba(37, 99, 235, 0.22);
+  box-shadow: 0 12px 24px rgba(22, 130, 83, 0.20);
 }
 
 .ghost-button {
@@ -177,7 +177,7 @@ h3 {
 .tab-button:hover,
 .icon-button:hover {
   transform: translateY(-1px);
-  border-color: rgba(37, 99, 235, 0.38);
+  border-color: rgba(22, 130, 83, 0.38);
   box-shadow: 0 12px 26px rgba(16, 24, 40, 0.08);
 }
 
