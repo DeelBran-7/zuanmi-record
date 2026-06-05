@@ -1496,7 +1496,7 @@ function escapeAttr(value) {
 
 function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=28').then((registration) => {
+    navigator.serviceWorker.register('./sw.js?v=29').then((registration) => {
       registration.update().catch(() => {});
     }).catch(() => {});
   }
