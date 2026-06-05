@@ -1,4 +1,4 @@
-const CACHE_NAME = 'zuanmi-record-v29';
+const CACHE_NAME = 'zuanmi-record-v30';
 const ASSETS = [
   './',
   './index.html',

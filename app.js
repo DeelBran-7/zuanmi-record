@@ -106,6 +106,8 @@ const elements = {
   },
   recordDialog: document.querySelector('#recordDialog'),
   recordForm: document.querySelector('#recordForm'),
+  yearDialog: document.querySelector('#yearDialog'),
+  yearForm: document.querySelector('#yearForm'),
   assetDialog: document.querySelector('#assetDialog'),
   assetForm: document.querySelector('#assetForm'),
   assetDetailDialog: document.querySelector('#assetDetailDialog'),
@@ -127,6 +129,7 @@ function init() {
   elements.authForgotPasswordButton?.addEventListener('click', requestPasswordReset);
   elements.tabs.forEach((button) => button.addEventListener('click', () => switchView(button.dataset.view)));
   elements.recordForm.addEventListener('submit', handleRecordSubmit);
+  elements.yearForm.addEventListener('submit', handleYearSubmit);
   elements.assetForm.addEventListener('submit', handleAssetSubmit);
   elements.assetForm.elements.assetClassHint?.addEventListener('change', syncAssetCategoryOptions);
   elements.importForm.addEventListener('submit', handleImportSubmit);
@@ -1335,17 +1338,24 @@ async function fetchGoldPrice() {
 
 function addYear() {
   const nextYear = Math.max(...getKnownYears()) + 1;
-  const rawYear = window.prompt('输入要新增的年份', String(nextYear));
-  if (!rawYear) return;
-  const year = Number(rawYear);
+  elements.yearForm.reset();
+  elements.yearForm.elements.year.value = nextYear;
+  elements.yearForm.elements.target.value = state.settings.targets[state.settings.selectedYear] || 400000;
+  elements.yearDialog.showModal();
+}
+
+function handleYearSubmit(event) {
+  event.preventDefault();
+  const form = new FormData(elements.yearForm);
+  const year = Number(form.get('year'));
   if (!Number.isInteger(year) || year < 2000 || year > 2100) {
     toast('年份格式不对');
     return;
   }
-  const rawTarget = window.prompt(`${year} 年目标金额`, String(state.settings.targets[state.settings.selectedYear] || 400000));
-  state.settings.targets[year] = Number(rawTarget) || 0;
+  state.settings.targets[year] = Number(form.get('target')) || 0;
   state.settings.selectedYear = year;
   saveState();
+  elements.yearDialog.close();
   toast(`已新增 ${year}`);
   render();
 }
@@ -1496,7 +1506,7 @@ function escapeAttr(value) {
 
 function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=29').then((registration) => {
+    navigator.serviceWorker.register('./sw.js?v=30').then((registration) => {
       registration.update().catch(() => {});
     }).catch(() => {});
   }
