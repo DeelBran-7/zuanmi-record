@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#101010">
     <title>赚米记录</title>
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=32">
+    <link rel="stylesheet" href="./styles.css?v=33">
   </head>
   <body>
     <section class="auth-gate" id="authGate" hidden>
@@ -66,6 +66,7 @@
           <button class="tab-button" data-view="year">年度</button>
           <button class="tab-button" data-view="records">记录</button>
           <button class="tab-button" data-view="sync">同步</button>
+          <button class="tab-button" data-view="help">说明</button>
         </nav>
 
         <section class="view active" id="dashboardView"></section>
@@ -73,6 +74,7 @@
         <section class="view" id="yearView"></section>
         <section class="view" id="recordsView"></section>
         <section class="view" id="syncView"></section>
+        <section class="view" id="helpView"></section>
       </main>
     </div>
 
@@ -227,7 +229,7 @@
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="./site-config.js?v=32"></script>
-    <script type="module" src="./app.js?v=32"></script>
+    <script src="./site-config.js?v=33"></script>
+    <script type="module" src="./app.js?v=33"></script>
   </body>
 </html>

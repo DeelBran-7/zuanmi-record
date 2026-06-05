@@ -560,9 +560,71 @@ h3 {
 
 .asset-list,
 .record-list,
-.month-list {
+.month-list,
+.help-grid,
+.rule-list {
   display: grid;
   gap: 9px;
+}
+
+.help-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+}
+
+.help-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  padding: 13px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 10px 26px rgba(16, 24, 40, 0.04);
+}
+
+.help-step {
+  display: inline-flex;
+  width: 34px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: #101010;
+  color: var(--gold);
+  font-weight: 850;
+  box-shadow: 0 0 18px rgba(201, 255, 61, 0.18);
+}
+
+.help-card h3 {
+  margin-bottom: 4px;
+}
+
+.help-card p {
+  margin-bottom: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.rule-row {
+  display: grid;
+  grid-template-columns: minmax(84px, 0.32fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background: rgba(248, 250, 252, 0.76);
+}
+
+.rule-row strong {
+  color: var(--ink);
+}
+
+.rule-row span {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
 }
 
 .asset-group {
@@ -732,7 +794,7 @@ h3 {
   }
 
   .tabs {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
   }
 }
 
@@ -1113,7 +1175,8 @@ textarea {
 
   .record-row,
   .month-row,
-  .flow-row {
+  .flow-row,
+  .rule-row {
     grid-template-columns: 1fr;
   }
 

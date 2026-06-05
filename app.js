@@ -111,6 +111,7 @@ const elements = {
     year: document.querySelector('#yearView'),
     records: document.querySelector('#recordsView'),
     sync: document.querySelector('#syncView'),
+    help: document.querySelector('#helpView'),
   },
   recordDialog: document.querySelector('#recordDialog'),
   recordForm: document.querySelector('#recordForm'),
@@ -207,6 +208,7 @@ function render() {
   renderYear();
   renderRecords();
   renderSync();
+  renderHelp();
   populateRecordForm();
   applyCurrentView();
 }
@@ -453,6 +455,63 @@ function renderSync() {
     </section>
   `;
   bindCommonActions(elements.views.sync);
+}
+
+function renderHelp() {
+  elements.views.help.innerHTML = `
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <h2>使用说明</h2>
+          <p class="small-muted">按这个顺序用，账本会最清楚。</p>
+        </div>
+      </div>
+      <div class="help-grid">
+        ${helpCard('1', '先建资产', '在“资产”里新增项目。实体项目、股票黄金、当前存款要分开建，这样总营收和投资盈亏不会混在一起。')}
+        ${helpCard('2', '再记流水', '点“记一笔”记录投入、分红、亏损、消费、黄金买入或当前估值。所有汇总数字都来自这些记录。')}
+        ${helpCard('3', '看总览', '“总览”看目前资产、目标进度、总营收、已花掉和投资盈亏，适合每天快速看一眼。')}
+        ${helpCard('4', '看年度', '“年度”按年份回看。点“+ 年份”可以新增 2028、2029 或之后的目标。')}
+        ${helpCard('5', '看资产详情', '点进每个资产，可以看按月趋势、年度汇总、类型占比和原始记录，记录很多也不用一条条翻。')}
+        ${helpCard('6', '同步备份', '登录同一个邮箱可以多设备同步。大改数据前建议先在“同步”里导出 JSON 备份。')}
+      </div>
+    </section>
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <h3>几个容易搞混的逻辑</h3>
+          <p class="small-muted">这里是这个账本和普通记账本不一样的地方。</p>
+        </div>
+      </div>
+      <div class="rule-list">
+        ${ruleRow('总营收', '只看实体/现金流类资产赚了多少钱，不把股票、黄金账户里的内部收益混进去。')}
+        ${ruleRow('目前资产', '等于各资产当前价值，加上已经结算留下来的现金，再扣掉花掉/消费。')}
+        ${ruleRow('投资账户', '股票、黄金、基金、Crypto 的收益留在账户里，只有你记录取出/回款时才体现为取出。')}
+        ${ruleRow('黄金浮盈', '黄金会按买入克数、成本和当前金价计算浮盈；股票不自动看浮亏，需要你手动记。')}
+        ${ruleRow('归档资产', '归档只代表项目结束或暂时不看，历史资金仍然参与总资产计算。')}
+      </div>
+    </section>
+  `;
+}
+
+function helpCard(step, title, text) {
+  return `
+    <article class="help-card">
+      <span class="help-step">${step}</span>
+      <div>
+        <h3>${title}</h3>
+        <p>${text}</p>
+      </div>
+    </article>
+  `;
+}
+
+function ruleRow(title, text) {
+  return `
+    <div class="rule-row">
+      <strong>${title}</strong>
+      <span>${text}</span>
+    </div>
+  `;
 }
 
 function renderAssetCard(assetSummary) {
@@ -1552,7 +1611,7 @@ function escapeAttr(value) {
 
 function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=32').then((registration) => {
+    navigator.serviceWorker.register('./sw.js?v=33').then((registration) => {
       registration.update().catch(() => {});
     }).catch(() => {});
   }
