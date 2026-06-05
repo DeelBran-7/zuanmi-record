@@ -495,6 +495,7 @@ function renderAssetDetail(assetId) {
         <h3>记录明细</h3>
         <div class="button-row">
           <button class="ghost-button" data-action="toggle-archive" data-asset-id="${asset.id}">${asset.status === 'archived' ? '恢复' : '归档'}</button>
+          <button class="ghost-button danger-button" data-action="delete-asset" data-asset-id="${asset.id}">删除资产</button>
           <button class="primary-button" data-action="new-record-for-asset" data-asset-id="${asset.id}">新增记录</button>
         </div>
       </div>
@@ -617,6 +618,7 @@ function bindCommonActions(root) {
       if (action === 'year-view') switchView('year');
       if (action === 'records-view') switchView('records');
       if (action === 'delete-record') deleteRecord(element.dataset.recordId);
+      if (action === 'delete-asset') deleteAsset(element.dataset.assetId);
       if (action === 'toggle-archive') toggleArchive(element.dataset.assetId);
       if (action === 'move-asset-up') moveAssetOrder(element.dataset.assetId, -1);
       if (action === 'move-asset-down') moveAssetOrder(element.dataset.assetId, 1);
@@ -661,6 +663,20 @@ function deleteRecord(recordId) {
   state.records = state.records.filter((record) => record.id !== recordId);
   saveState();
   toast('已删除记录');
+  render();
+}
+
+function deleteAsset(assetId) {
+  const asset = state.assets.find((item) => item.id === assetId);
+  if (!asset) return;
+  const recordCount = state.records.filter((record) => record.assetId === assetId).length;
+  const message = `确定删除「${asset.name}」吗？这会同时删除 ${recordCount} 条记录，不能撤销。`;
+  if (!window.confirm(message)) return;
+  state.assets = normalizeAssetOrder(state.assets.filter((item) => item.id !== assetId));
+  state.records = state.records.filter((record) => record.assetId !== assetId);
+  saveState();
+  elements.assetDetailDialog.close();
+  toast('资产已删除');
   render();
 }
 
@@ -1217,7 +1233,7 @@ function escapeAttr(value) {
 
 function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=20').then((registration) => {
+    navigator.serviceWorker.register('./sw.js?v=21').then((registration) => {
       registration.update().catch(() => {});
     }).catch(() => {});
   }

@@ -159,6 +159,11 @@ h3 {
   background: #ffffff;
 }
 
+.danger-button {
+  border-color: rgba(217, 45, 32, 0.25);
+  color: var(--loss);
+}
+
 .text-button {
   width: 100%;
   justify-content: center;
