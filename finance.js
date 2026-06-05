@@ -4,6 +4,7 @@ export const RECORD_TYPES = {
   realized_profit: { label: '已实现盈利', sign: 1 },
   realized_loss: { label: '已实现亏损', sign: -1 },
   dividend: { label: '分红/利息', sign: 1 },
+  expense: { label: '花掉/消费', sign: -1 },
   fee: { label: '手续费/成本', sign: -1 },
   gold_buy: { label: '黄金买入', sign: 1 },
   valuation: { label: '当前估值', sign: 0 },
@@ -50,8 +51,9 @@ export function calculateAssetSummary(asset, records, options = {}) {
   const assetRecords = recordsForAsset(asset.id, records);
   const capitalIn = money(sumByTypes(assetRecords, ['capital_in', 'gold_buy']));
   const capitalOut = money(sumByTypes(assetRecords, ['capital_out']));
-  const realizedProfit = money(sumByTypes(assetRecords, ['realized_profit', 'dividend']));
+  const grossRevenue = money(sumByTypes(assetRecords, ['realized_profit', 'dividend']));
   const realizedLoss = money(sumByTypes(assetRecords, ['realized_loss', 'fee']));
+  const spent = money(sumByTypes(assetRecords, ['expense']));
   const latestValuation = findLatestAmount(assetRecords, 'valuation');
   const gold = asset.category === 'gold' ? getGoldSummary(asset, records, options) : null;
 
@@ -64,10 +66,7 @@ export function calculateAssetSummary(asset, records, options = {}) {
   } else if (latestValuation !== null) {
     currentValue = money(latestValuation);
   } else {
-    currentValue = money(capitalIn - capitalOut + realizedProfit - realizedLoss);
-    if (asset.category === 'business') {
-      currentValue = money(capitalIn - capitalOut);
-    }
+    currentValue = money(capitalIn - capitalOut + grossRevenue - realizedLoss - spent);
   }
 
   return {
@@ -79,9 +78,12 @@ export function calculateAssetSummary(asset, records, options = {}) {
     principal: money(capitalIn - capitalOut),
     capitalIn,
     capitalOut,
-    realizedProfit,
+    grossRevenue,
+    realizedProfit: grossRevenue,
     realizedLoss,
-    netRealized: money(realizedProfit - realizedLoss),
+    spent,
+    netRealized: money(grossRevenue - realizedLoss),
+    retainedRevenue: money(grossRevenue - realizedLoss - spent),
     currentValue,
     floatingProfit,
     recordCount: assetRecords.length,
@@ -90,11 +92,12 @@ export function calculateAssetSummary(asset, records, options = {}) {
 }
 
 export function calculatePortfolioSummary(assets, records, options = {}) {
-  const activeAssets = assets.filter((asset) => asset.status !== 'archived' || options.includeArchived);
-  const assetSummaries = activeAssets.map((asset) => calculateAssetSummary(asset, records, options));
+  const assetSummaries = assets.map((asset) => calculateAssetSummary(asset, records, options));
   const totalAssets = money(assetSummaries.reduce((sum, asset) => sum + cnyAmount(asset.currentValue, asset.currency), 0));
   const principal = money(assetSummaries.reduce((sum, asset) => sum + cnyAmount(asset.principal, asset.currency), 0));
+  const grossRevenue = money(assetSummaries.reduce((sum, asset) => sum + cnyAmount(asset.grossRevenue, asset.currency), 0));
   const realizedProfit = money(assetSummaries.reduce((sum, asset) => sum + cnyAmount(asset.netRealized, asset.currency), 0));
+  const spent = money(assetSummaries.reduce((sum, asset) => sum + cnyAmount(asset.spent, asset.currency), 0));
   const goldFloatingProfit = money(assetSummaries.reduce((sum, asset) => {
     if (asset.category !== 'gold' || asset.floatingProfit === null) return sum;
     return sum + cnyAmount(asset.floatingProfit, asset.currency);
@@ -106,9 +109,11 @@ export function calculatePortfolioSummary(assets, records, options = {}) {
     target,
     totalAssets,
     principal,
+    grossRevenue,
     realizedProfit,
+    spent,
     goldFloatingProfit,
-    trueProfit: money(realizedProfit + goldFloatingProfit),
+    trueProfit: money(realizedProfit - spent + goldFloatingProfit),
     targetProgress: target > 0 ? money((totalAssets / target) * 100) : 0,
     targetRemaining: target > 0 ? money(Math.max(target - totalAssets, 0)) : 0,
     assets: assetSummaries,
@@ -164,8 +169,10 @@ export function calculateYearSummary(assets, records, options = {}) {
     return {
       month,
       netContribution: monthActivity.principal,
+      grossRevenue: monthActivity.grossRevenue,
       realizedProfit: monthActivity.realizedProfit,
-      trueProfit: money(monthActivity.realizedProfit + monthCumulative.goldFloatingProfit),
+      spent: monthActivity.spent,
+      trueProfit: money(monthActivity.realizedProfit - monthActivity.spent + monthCumulative.goldFloatingProfit),
       assets: monthCumulative.totalAssets,
     };
   });
@@ -173,8 +180,10 @@ export function calculateYearSummary(assets, records, options = {}) {
   return {
     ...portfolio,
     netContribution: activity.principal,
+    grossRevenue: activity.grossRevenue,
     realizedProfit: activity.realizedProfit,
-    trueProfit: money(activity.realizedProfit + portfolio.goldFloatingProfit),
+    spent: activity.spent,
+    trueProfit: money(activity.realizedProfit - activity.spent + portfolio.goldFloatingProfit),
     months,
   };
 }

@@ -188,7 +188,7 @@ function renderDashboard() {
       <section>
         <article class="hero-card">
           <div class="hero-top">
-            <span>${state.settings.selectedYear} 总资产</span>
+            <span>${state.settings.selectedYear} 目前资产</span>
             <span>目标 ${formatCurrency(summary.target)}</span>
           </div>
           <div class="hero-number">${formatCurrency(summary.totalAssets)}</div>
@@ -202,14 +202,14 @@ function renderDashboard() {
         </article>
 
         <section class="insight-strip" aria-label="数据口径">
-          <span>股票按手动记录</span>
-          <span>黄金可实时估值</span>
-          <span>每个人独立数据</span>
+          <span>归档仍计入资产</span>
+          <span>营收和现有资金分开</span>
+          <span>消费会减少目前资产</span>
         </section>
 
         <div class="metric-grid">
-          ${metric('年度净投入', formatCurrency(yearSummary.netContribution))}
-          ${metric('已实现盈亏', signedCurrency(summary.realizedProfit), summary.realizedProfit >= 0 ? 'profit' : 'loss')}
+          ${metric('总营收', formatCurrency(summary.grossRevenue))}
+          ${metric('已花掉', formatCurrency(summary.spent), summary.spent > 0 ? 'loss' : '')}
           ${metric('黄金浮盈', summary.goldFloatingProfit ? signedCurrency(summary.goldFloatingProfit) : '待金价', summary.goldFloatingProfit >= 0 ? 'profit' : 'loss')}
         </div>
 
@@ -273,7 +273,7 @@ function renderAssets() {
       <div class="panel-header">
         <div>
           <h2>资产管理</h2>
-          <p class="small-muted">长按资产可调整顺序。归档资产会收进下方归档区，历史记录仍保留。</p>
+          <p class="small-muted">长按资产可调整顺序。归档只代表项目结束，资金仍计入目前资产。</p>
         </div>
         <button class="primary-button" data-action="new-asset">新增资产</button>
       </div>
@@ -303,13 +303,15 @@ function renderYear() {
       <div class="panel-header">
         <div>
           <h2>${state.settings.selectedYear} 年度复盘</h2>
-          <p class="small-muted">总资产增长不等于赚了多少钱，这里分开看净投入和真实盈亏。</p>
+          <p class="small-muted">这里把目前资产、总营收、消费和净投入分开看。</p>
         </div>
       </div>
       <div class="metric-grid">
-        ${metric('年内资产', formatCurrency(summary.totalAssets))}
+        ${metric('目前资产', formatCurrency(summary.totalAssets))}
+        ${metric('总营收', formatCurrency(summary.grossRevenue))}
+        ${metric('已花掉', formatCurrency(summary.spent), summary.spent > 0 ? 'loss' : '')}
         ${metric('年度净投入', formatCurrency(summary.netContribution))}
-        ${metric('年度真实盈亏', signedCurrency(summary.trueProfit), summary.trueProfit >= 0 ? 'profit' : 'loss')}
+        ${metric('留存收益', signedCurrency(summary.trueProfit), summary.trueProfit >= 0 ? 'profit' : 'loss')}
       </div>
       <div class="month-list">
         ${summary.months.map(renderMonthRow).join('')}
@@ -401,7 +403,7 @@ function renderAssetCard(assetSummary) {
       <div class="asset-values">
         <strong>${formatCurrency(assetSummary.currentValue, asset.currency)}</strong>
         <div class="asset-meta">本金 ${formatCurrency(assetSummary.principal, asset.currency)}</div>
-        <div class="${assetSummary.netRealized >= 0 ? 'profit' : 'loss'}">${signedCurrency(assetSummary.netRealized, asset.currency)}</div>
+        <div class="${assetSummary.retainedRevenue >= 0 ? 'profit' : 'loss'}">留存 ${signedCurrency(assetSummary.retainedRevenue, asset.currency)}</div>
       </div>
       ${isReordering ? `
         <div class="reorder-controls">
@@ -436,7 +438,8 @@ function renderMonthRow(month) {
     <div class="month-row">
       <strong>${month.month}月</strong>
       <span>投入 ${formatCurrency(month.netContribution)}</span>
-      <span class="${month.trueProfit >= 0 ? 'profit' : 'loss'}">盈亏 ${signedCurrency(month.trueProfit)}</span>
+      <span>营收 ${formatCurrency(month.grossRevenue)}</span>
+      <span class="${month.spent > 0 ? 'loss' : ''}">花掉 ${formatCurrency(month.spent)}</span>
       <span>资产 ${formatCurrency(month.assets)}</span>
     </div>
   `;
@@ -472,19 +475,21 @@ function renderAssetDetail(assetId) {
     </div>
     <article class="hero-card">
       <div class="hero-top">
-        <span>当前价值</span>
+        <span>目前价值</span>
         <span>${asset.note ? escapeHtml(asset.note) : '可持续记录'}</span>
       </div>
       <div class="hero-number">${formatCurrency(summary.currentValue, asset.currency)}</div>
       <div class="hero-meta">
         <span>本金 ${formatCurrency(summary.principal, asset.currency)}</span>
-        <span>已实现 ${signedCurrency(summary.netRealized, asset.currency)}</span>
+        <span>留存收益 ${signedCurrency(summary.retainedRevenue, asset.currency)}</span>
       </div>
     </article>
     <div class="metric-grid">
       ${metric('投入本金', formatCurrency(summary.capitalIn, asset.currency))}
       ${metric('回款/取出', formatCurrency(summary.capitalOut, asset.currency))}
-      ${metric('ROI', summary.principal ? formatPercent((summary.netRealized / summary.principal) * 100) : '0%')}
+      ${metric('总营收', formatCurrency(summary.grossRevenue, asset.currency))}
+      ${metric('已花掉', formatCurrency(summary.spent, asset.currency), summary.spent > 0 ? 'loss' : '')}
+      ${metric('留存收益率', summary.principal ? formatPercent((summary.retainedRevenue / summary.principal) * 100) : '0%')}
     </div>
     ${goldHtml}
     <section class="panel">
@@ -1158,7 +1163,7 @@ function escapeAttr(value) {
 
 function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=17').then((registration) => {
+    navigator.serviceWorker.register('./sw.js?v=18').then((registration) => {
       registration.update().catch(() => {});
     }).catch(() => {});
   }

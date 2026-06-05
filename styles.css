@@ -1,19 +1,19 @@
 :root {
   color-scheme: light;
-  --bg: #eef3f2;
-  --panel: #fbfcfa;
+  --bg: #f4f6f8;
+  --panel: #ffffff;
   --card: #ffffff;
-  --ink: #1f2933;
-  --muted: #718096;
-  --line: #d6ddd6;
-  --line-soft: #e8eee8;
-  --green: #263f39;
-  --green-2: #2f5d50;
-  --profit: #23734f;
-  --loss: #b42318;
-  --gold: #f4cf7a;
-  --blue: #315f7d;
-  --shadow: 0 14px 35px rgba(31, 41, 51, 0.08);
+  --ink: #111827;
+  --muted: #667085;
+  --line: #e2e8f0;
+  --line-soft: #edf1f5;
+  --green: #101828;
+  --green-2: #2563eb;
+  --profit: #168253;
+  --loss: #d92d20;
+  --gold: #b7f34a;
+  --blue: #2563eb;
+  --shadow: 0 18px 38px rgba(16, 24, 40, 0.08);
 }
 
 * {
@@ -65,7 +65,7 @@ button {
   width: min(440px, 100%);
   padding: 24px;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 8px;
   background: var(--card);
   box-shadow: var(--shadow);
 }
@@ -155,7 +155,7 @@ h3 {
 }
 
 .ghost-button {
-  background: transparent;
+  background: #ffffff;
 }
 
 .icon-button {
@@ -221,7 +221,7 @@ h3 {
   color: white;
   padding: 20px;
   box-shadow: var(--shadow);
-  border-color: rgba(38, 63, 57, 0.2);
+  border-color: rgba(16, 24, 40, 0.2);
 }
 
 .hero-top {
@@ -243,7 +243,7 @@ h3 {
   height: 8px;
   overflow: hidden;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.16);
 }
 
 .progress-fill {
@@ -277,10 +277,10 @@ h3 {
 
 .insight-strip span {
   min-height: 38px;
-  border: 1px solid #cdd9d7;
+  border: 1px solid rgba(37, 99, 235, 0.16);
   border-radius: 8px;
-  background: #f7fbfa;
-  color: #315f7d;
+  background: #ffffff;
+  color: var(--blue);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -373,9 +373,9 @@ h3 {
 }
 
 .asset-card.reordering {
-  border-color: var(--green-2);
-  background: #f4faf6;
-  box-shadow: 0 0 0 2px rgba(47, 93, 80, 0.12);
+  border-color: var(--blue);
+  background: #f8fbff;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
 }
 
 .reorder-hint {
@@ -405,7 +405,7 @@ h3 {
   align-items: center;
   border-radius: 999px;
   padding: 5px 8px;
-  background: #e3f2e9;
+  background: #e9f8ef;
   color: var(--profit);
   font-size: 12px;
   font-weight: 700;
@@ -447,10 +447,17 @@ h3 {
 .record-row,
 .month-row {
   display: grid;
-  grid-template-columns: 1.1fr 1fr 0.9fr auto;
   gap: 10px;
   align-items: center;
   padding: 12px;
+}
+
+.record-row {
+  grid-template-columns: 1.1fr 1fr 0.9fr auto;
+}
+
+.month-row {
+  grid-template-columns: 0.75fr repeat(4, minmax(0, 1fr));
 }
 
 .month-row {
@@ -550,9 +557,9 @@ textarea {
   flex-direction: column;
   gap: 4px;
   padding: 10px 12px;
-  border: 1px solid rgba(38, 63, 57, 0.16);
+  border: 1px solid rgba(37, 99, 235, 0.16);
   border-radius: 8px;
-  background: rgba(221, 238, 231, 0.55);
+  background: rgba(37, 99, 235, 0.06);
 }
 
 .sync-ready span {

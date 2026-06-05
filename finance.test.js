@@ -53,11 +53,12 @@ test('portfolio summary keeps realized profit separate from gold floating profit
     goldPricePerGram: 1200,
   });
 
-  assert.equal(summary.totalAssets, 226000);
+  assert.equal(summary.totalAssets, 236000);
   assert.equal(summary.principal, 195123.16);
+  assert.equal(summary.grossRevenue, 40000);
   assert.equal(summary.realizedProfit, 40000);
   assert.equal(summary.goldFloatingProfit, 876.84);
-  assert.equal(summary.targetProgress, 56.5);
+  assert.equal(summary.targetProgress, 59);
 });
 
 test('year summary separates net contribution from real yearly profit', () => {
@@ -117,4 +118,46 @@ test('moving an asset only reorders assets in the same status group', () => {
 
   assert.deepEqual(moved.map((asset) => asset.id), ['b', 'a', 'c']);
   assert.deepEqual(moved.map((asset) => asset.displayOrder), [0, 1, 2]);
+});
+
+test('archived assets still count toward current assets', () => {
+  const summary = calculatePortfolioSummary([
+    { id: 'done', name: '结束项目', category: 'business', currency: 'CNY', status: 'archived' },
+  ], [
+    { id: 'done-capital', assetId: 'done', type: 'capital_in', amount: 100000, date: '2026-01-01' },
+  ], { year: 2026, target: 400000, goldPricePerGram: 0 });
+
+  assert.equal(summary.totalAssets, 100000);
+  assert.equal(summary.assets.length, 1);
+});
+
+test('spending revenue reduces current assets but not gross revenue', () => {
+  const summary = calculatePortfolioSummary([
+    { id: 'business', name: '业务', category: 'business', currency: 'CNY', status: 'active' },
+  ], [
+    { id: 'capital', assetId: 'business', type: 'capital_in', amount: 100000, date: '2026-01-01' },
+    { id: 'dividend', assetId: 'business', type: 'dividend', amount: 10000, date: '2026-03-01' },
+    { id: 'spent', assetId: 'business', type: 'expense', amount: 3000, date: '2026-03-02' },
+  ], { year: 2026, target: 400000, goldPricePerGram: 0 });
+
+  assert.equal(summary.totalAssets, 107000);
+  assert.equal(summary.grossRevenue, 10000);
+  assert.equal(summary.spent, 3000);
+  assert.equal(summary.trueProfit, 7000);
+});
+
+test('year summary separates gross revenue, spending, and retained profit', () => {
+  const summary = calculateYearSummary([
+    { id: 'business', name: '业务', category: 'business', currency: 'CNY', status: 'active' },
+  ], [
+    { id: 'capital', assetId: 'business', type: 'capital_in', amount: 100000, date: '2026-01-01' },
+    { id: 'dividend', assetId: 'business', type: 'dividend', amount: 10000, date: '2026-03-01' },
+    { id: 'spent', assetId: 'business', type: 'expense', amount: 3000, date: '2026-03-02' },
+  ], { year: 2026, target: 400000, goldPricePerGram: 0 });
+
+  assert.equal(summary.grossRevenue, 10000);
+  assert.equal(summary.spent, 3000);
+  assert.equal(summary.trueProfit, 7000);
+  assert.equal(summary.months[2].grossRevenue, 10000);
+  assert.equal(summary.months[2].spent, 3000);
 });
