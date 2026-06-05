@@ -68,6 +68,7 @@ let currentSession = null;
 let autoCloudDownloadUserId = null;
 let reorderAssetId = null;
 let longPressTimer = null;
+let passwordResetMode = false;
 
 const elements = {
   appShell: document.querySelector('#appShell'),
@@ -76,6 +77,7 @@ const elements = {
   authPasswordInput: document.querySelector('#authPasswordInput'),
   authSignInButton: document.querySelector('#authSignInButton'),
   authSignUpButton: document.querySelector('#authSignUpButton'),
+  authForgotPasswordButton: document.querySelector('#authForgotPasswordButton'),
   yearStrip: document.querySelector('#yearStrip'),
   tabs: document.querySelectorAll('.tab-button'),
   views: {
@@ -105,6 +107,7 @@ function init() {
   document.querySelector('#exportButton').addEventListener('click', exportState);
   elements.authSignInButton?.addEventListener('click', signInWithPassword);
   elements.authSignUpButton?.addEventListener('click', signUpWithPassword);
+  elements.authForgotPasswordButton?.addEventListener('click', requestPasswordReset);
   elements.tabs.forEach((button) => button.addEventListener('click', () => switchView(button.dataset.view)));
   elements.recordForm.addEventListener('submit', handleRecordSubmit);
   elements.assetForm.addEventListener('submit', handleAssetSubmit);
@@ -157,6 +160,7 @@ function render() {
   renderRecords();
   renderSync();
   populateRecordForm();
+  applyCurrentView();
 }
 
 function renderYearStrip() {
@@ -628,6 +632,7 @@ function bindCommonActions(root) {
       if (action === 'fetch-gold') fetchGoldPrice();
       if (action === 'sign-in-password') signInWithPassword();
       if (action === 'sign-up-password') signUpWithPassword();
+      if (action === 'forgot-password') requestPasswordReset();
       if (action === 'update-password') updatePassword();
       if (action === 'sync-upload') uploadCloudState();
       if (action === 'sync-download') downloadCloudState();
@@ -650,8 +655,12 @@ function bindCommonActions(root) {
 
 function switchView(view) {
   currentView = view;
-  elements.tabs.forEach((button) => button.classList.toggle('active', button.dataset.view === view));
-  Object.entries(elements.views).forEach(([name, element]) => element.classList.toggle('active', name === view));
+  applyCurrentView();
+}
+
+function applyCurrentView() {
+  elements.tabs.forEach((button) => button.classList.toggle('active', button.dataset.view === currentView));
+  Object.entries(elements.views).forEach(([name, element]) => element.classList.toggle('active', name === currentView));
 }
 
 function deleteRecord(recordId) {
@@ -732,11 +741,18 @@ function initSupabaseClient() {
     return;
   }
   supabaseClient = window.supabase.createClient(supabaseUrl, anonKey, {
-    auth: { persistSession: true, autoRefreshToken: true },
+    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
   });
   supabaseClient.auth.getSession().then(({ data }) => handleCloudSession(data.session)).catch(() => {});
   supabaseClient.auth.onAuthStateChange((event, session) => {
-    window.setTimeout(() => handleCloudSession(session), 0);
+    if (event === 'PASSWORD_RECOVERY') {
+      passwordResetMode = true;
+      currentView = 'sync';
+    }
+    window.setTimeout(async () => {
+      await handleCloudSession(session);
+      if (event === 'PASSWORD_RECOVERY') toast('请输入新密码');
+    }, 0);
   });
 }
 
@@ -800,13 +816,19 @@ function renderCloudAuth(configured, signedIn) {
         <strong>${escapeHtml(email)}</strong>
         <span class="status-pill">已绑定</span>
       </div>
+      ${passwordResetMode ? `
+        <div class="sync-ready">
+          <strong>正在重置密码</strong>
+          <span>输入新密码后点击“设置新密码”，以后就用新密码登录。</span>
+        </div>
+      ` : ''}
       <div class="settings-grid">
         <label>新密码<input id="newPasswordInput" type="password" autocomplete="new-password" placeholder="至少 6 位"></label>
       </div>
       <div class="button-row">
         <button class="primary-button" data-action="sync-upload">上传本机账本</button>
         <button class="ghost-button" data-action="sync-download">拉取云端账本</button>
-        <button class="ghost-button" data-action="update-password">修改密码</button>
+        <button class="ghost-button" data-action="update-password">${passwordResetMode ? '设置新密码' : '修改密码'}</button>
         <button class="ghost-button" data-action="sign-out">退出登录</button>
       </div>
     `;
@@ -819,6 +841,7 @@ function renderCloudAuth(configured, signedIn) {
     <div class="button-row">
       <button class="primary-button" data-action="sign-in-password">登录</button>
       <button class="ghost-button" data-action="sign-up-password">注册</button>
+      <button class="ghost-button" data-action="forgot-password">忘记密码</button>
     </div>
   `;
 }
@@ -826,7 +849,7 @@ function renderCloudAuth(configured, signedIn) {
 function cloudStatusText(configured, signedIn) {
   if (!configured) return '需要先配置 Supabase 项目。';
   if (signedIn) return '已登录。上传会覆盖云端账本；拉取会覆盖本机账本，操作前可先导出备份。';
-  return '邮箱和密码登录，不消耗邮件额度。第一次使用先注册。';
+  return '邮箱和密码登录。第一次使用先注册；忘记密码可以发邮件重置。';
 }
 
 function getSyncSettings() {
@@ -902,9 +925,46 @@ async function updatePassword() {
     const { error } = await supabaseClient.auth.updateUser({ password });
     if (error) throw error;
     document.querySelector('#newPasswordInput').value = '';
+    passwordResetMode = false;
+    clearPasswordResetUrl();
     toast('密码已更新');
+    render();
   } catch (error) {
     toast(`修改失败：${error.message || '请稍后再试'}`);
+  }
+}
+
+async function requestPasswordReset() {
+  if (!supabaseClient) return toast('请先保存 Supabase 配置');
+  const email = readAuthEmail();
+  if (!email) return toast('请输入邮箱，再发送重置邮件');
+  try {
+    writeAuthEmail(email);
+    state.settings.sync.email = email;
+    saveState();
+    const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+      redirectTo: getPasswordResetRedirectUrl(),
+    });
+    if (error) throw error;
+    toast('重置邮件已发送，请去邮箱打开链接');
+  } catch (error) {
+    toast(`发送失败：${error.message || '请稍后再试'}`);
+  }
+}
+
+function getPasswordResetRedirectUrl() {
+  return 'https://deelbran-7.github.io/zuanmi-record/';
+}
+
+function clearPasswordResetUrl() {
+  if (!window.history?.replaceState || (!window.location.hash && !window.location.search)) return;
+  try {
+    const cleanUrl = new URL(window.location.href);
+    cleanUrl.hash = '';
+    cleanUrl.search = '';
+    window.history.replaceState({}, document.title, cleanUrl.toString());
+  } catch {
+    // URL cleanup is cosmetic; password update has already succeeded.
   }
 }
 
@@ -1163,7 +1223,7 @@ function escapeAttr(value) {
 
 function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=18').then((registration) => {
+    navigator.serviceWorker.register('./sw.js?v=19').then((registration) => {
       registration.update().catch(() => {});
     }).catch(() => {});
   }

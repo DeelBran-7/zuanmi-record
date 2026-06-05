@@ -136,6 +136,7 @@ h3 {
 
 .primary-button,
 .ghost-button,
+.text-button,
 .chip,
 .tab-button,
 .icon-button {
@@ -156,6 +157,15 @@ h3 {
 
 .ghost-button {
   background: #ffffff;
+}
+
+.text-button {
+  width: 100%;
+  justify-content: center;
+  border-color: transparent;
+  background: transparent;
+  color: var(--blue);
+  font-weight: 700;
 }
 
 .icon-button {
