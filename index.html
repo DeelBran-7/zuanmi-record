@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#101010">
     <title>赚米记录</title>
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=34">
+    <link rel="stylesheet" href="./styles.css?v=35">
   </head>
   <body>
     <section class="auth-gate" id="authGate" hidden>
@@ -30,13 +30,14 @@
           <h2 id="authTitle">登录账本</h2>
           <p class="small-muted" id="authSubtitle">输入邮箱和密码，打开你自己的云端账本。</p>
           <div class="auth-fields">
-            <label>邮箱<input id="authEmailInput" type="email" autocomplete="email" placeholder="you@example.com"></label>
+            <label id="authEmailField">邮箱<input id="authEmailInput" type="email" autocomplete="email" placeholder="you@example.com"></label>
             <label>密码<input id="authPasswordInput" type="password" autocomplete="current-password" placeholder="至少 6 位"></label>
             <label id="authConfirmField" hidden>确认密码<input id="authPasswordConfirmInput" type="password" autocomplete="new-password" placeholder="再输入一次密码"></label>
           </div>
           <div class="button-row">
             <button class="primary-button" id="authSignInButton" type="button">登录</button>
             <button class="primary-button" id="authSignUpButton" type="button" hidden>创建账号</button>
+            <button class="primary-button" id="authResetPasswordButton" type="button" hidden>设置新密码</button>
             <button class="ghost-button" id="authModeToggle" type="button">创建新账号</button>
           </div>
           <button class="text-button" id="authForgotPasswordButton" type="button">忘记密码？发送重置邮件</button>
@@ -229,7 +230,7 @@
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="./site-config.js?v=34"></script>
-    <script type="module" src="./app.js?v=34"></script>
+    <script src="./site-config.js?v=35"></script>
+    <script type="module" src="./app.js?v=35"></script>
   </body>
 </html>

@@ -12,7 +12,7 @@ import {
   recordsUntilYear,
   sortAssetsForDisplay,
 } from './finance.js';
-import { getBrowserPublicSyncConfig, normalizeEmail, resolveSyncSettings } from './sync-config.js';
+import { getBrowserPublicSyncConfig, getPasswordRecoveryInfo, normalizeEmail, resolveSyncSettings } from './sync-config.js';
 
 const STORAGE_KEY = 'zuanmi-record-state-v2';
 const OWNER_KEY = 'zuanmi-record-owner-v1';
@@ -86,6 +86,7 @@ let autoCloudDownloadUserId = null;
 let reorderAssetId = null;
 let longPressTimer = null;
 let passwordResetMode = false;
+let passwordRecoveryPromise = null;
 let authMode = 'signin';
 
 const elements = {
@@ -96,8 +97,11 @@ const elements = {
   authPasswordConfirmInput: document.querySelector('#authPasswordConfirmInput'),
   authSignInButton: document.querySelector('#authSignInButton'),
   authSignUpButton: document.querySelector('#authSignUpButton'),
+  authResetPasswordButton: document.querySelector('#authResetPasswordButton'),
   authModeToggle: document.querySelector('#authModeToggle'),
+  authModeSwitch: document.querySelector('.auth-mode-switch'),
   authModeButtons: document.querySelectorAll('[data-auth-mode]'),
+  authEmailField: document.querySelector('#authEmailField'),
   authConfirmField: document.querySelector('#authConfirmField'),
   authTitle: document.querySelector('#authTitle'),
   authSubtitle: document.querySelector('#authSubtitle'),
@@ -135,8 +139,21 @@ function init() {
   document.querySelector('#exportButton').addEventListener('click', exportState);
   elements.authSignInButton?.addEventListener('click', signInWithPassword);
   elements.authSignUpButton?.addEventListener('click', signUpWithPassword);
-  elements.authModeToggle?.addEventListener('click', () => setAuthMode(authMode === 'signin' ? 'signup' : 'signin'));
-  elements.authModeButtons.forEach((button) => button.addEventListener('click', () => setAuthMode(button.dataset.authMode)));
+  elements.authResetPasswordButton?.addEventListener('click', updatePassword);
+  elements.authModeToggle?.addEventListener('click', () => {
+    if (authMode === 'reset') {
+      passwordResetMode = false;
+      clearPasswordResetUrl();
+      setAuthMode('signin');
+      return;
+    }
+    setAuthMode(authMode === 'signin' ? 'signup' : 'signin');
+  });
+  elements.authModeButtons.forEach((button) => button.addEventListener('click', () => {
+    passwordResetMode = false;
+    clearPasswordResetUrl();
+    setAuthMode(button.dataset.authMode);
+  }));
   elements.authForgotPasswordButton?.addEventListener('click', requestPasswordReset);
   elements.tabs.forEach((button) => button.addEventListener('click', () => switchView(button.dataset.view)));
   elements.recordForm.addEventListener('submit', handleRecordSubmit);
@@ -1116,6 +1133,12 @@ function initSupabaseClient() {
   supabaseClient = window.supabase.createClient(supabaseUrl, anonKey, {
     auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
   });
+  const recoveryInfo = getPasswordRecoveryInfo(window.location.href);
+  if (recoveryInfo.hasRecovery) {
+    passwordResetMode = true;
+    authMode = 'reset';
+    recoverPasswordSessionFromUrl();
+  }
   supabaseClient.auth.getSession().then(({ data }) => handleCloudSession(data.session)).catch(() => {});
   supabaseClient.auth.onAuthStateChange((event, session) => {
     if (event === 'PASSWORD_RECOVERY') {
@@ -1146,37 +1169,47 @@ function updateAuthGate() {
   if (showGate && state.settings.sync.email && !elements.authEmailInput.value) {
     elements.authEmailInput.value = state.settings.sync.email;
   }
-  if (showGate) setAuthMode(authMode);
+  if (showGate) setAuthMode(passwordResetMode ? 'reset' : authMode);
   if (showGate) elements.onboardingDialog.close();
 }
 
 function setAuthMode(mode) {
-  authMode = mode === 'signup' ? 'signup' : 'signin';
+  authMode = mode === 'reset' ? 'reset' : mode === 'signup' ? 'signup' : 'signin';
   const isSignUp = authMode === 'signup';
+  const isReset = authMode === 'reset';
   elements.authModeButtons.forEach((button) => {
     button.classList.toggle('active', button.dataset.authMode === authMode);
   });
-  if (elements.authTitle) elements.authTitle.textContent = isSignUp ? '创建账号' : '登录账本';
+  if (elements.authModeSwitch) elements.authModeSwitch.hidden = isReset;
+  if (elements.authEmailField) elements.authEmailField.hidden = isReset;
+  if (elements.authTitle) elements.authTitle.textContent = isReset ? '设置新密码' : isSignUp ? '创建账号' : '登录账本';
   if (elements.authSubtitle) {
-    elements.authSubtitle.textContent = isSignUp
+    elements.authSubtitle.textContent = isReset
+      ? '重置链接已打开，输入新密码后就能继续使用这个账号。'
+      : isSignUp
       ? '用邮箱创建你的独立账本。注册成功后，这个邮箱就是你的同步账号。'
       : '输入邮箱和密码，打开你自己的云端账本。';
   }
   if (elements.authModeHint) {
-    elements.authModeHint.textContent = isSignUp
+    elements.authModeHint.textContent = isReset
+      ? '如果按钮提示链接还在校验，请等几秒再点；链接过期就重新发送重置邮件。'
+      : isSignUp
       ? '不会跳去外部注册页；账号会直接创建在当前应用里。'
       : '第一次使用请切到“创建账号”，注册成功后会自动进入你的空账本。';
   }
   if (elements.authPasswordInput) {
-    elements.authPasswordInput.autocomplete = isSignUp ? 'new-password' : 'current-password';
-    elements.authPasswordInput.placeholder = isSignUp ? '至少 6 位，建议不要和邮箱密码相同' : '至少 6 位';
+    elements.authPasswordInput.autocomplete = isSignUp || isReset ? 'new-password' : 'current-password';
+    elements.authPasswordInput.placeholder = isReset
+      ? '输入新密码'
+      : isSignUp ? '至少 6 位，建议不要和邮箱密码相同' : '至少 6 位';
   }
-  if (elements.authPasswordConfirmInput && !isSignUp) elements.authPasswordConfirmInput.value = '';
-  if (elements.authConfirmField) elements.authConfirmField.hidden = !isSignUp;
-  if (elements.authSignInButton) elements.authSignInButton.hidden = isSignUp;
+  if (elements.authPasswordConfirmInput && !isSignUp && !isReset) elements.authPasswordConfirmInput.value = '';
+  if (elements.authConfirmField) elements.authConfirmField.hidden = !isSignUp && !isReset;
+  if (elements.authSignInButton) elements.authSignInButton.hidden = isSignUp || isReset;
   if (elements.authSignUpButton) elements.authSignUpButton.hidden = !isSignUp;
-  if (elements.authModeToggle) elements.authModeToggle.textContent = isSignUp ? '已有账号，去登录' : '创建新账号';
-  if (elements.authForgotPasswordButton) elements.authForgotPasswordButton.hidden = isSignUp;
+  if (elements.authResetPasswordButton) elements.authResetPasswordButton.hidden = !isReset;
+  if (elements.authModeToggle) elements.authModeToggle.textContent = isReset ? '返回登录' : isSignUp ? '已有账号，去登录' : '创建新账号';
+  if (elements.authForgotPasswordButton) elements.authForgotPasswordButton.hidden = isSignUp || isReset;
 }
 
 function requiresLogin() {
@@ -1326,14 +1359,25 @@ function writeAuthEmail(email) {
 }
 
 async function updatePassword() {
-  if (!supabaseClient || !currentSession?.user) return toast('请先登录');
-  const password = document.querySelector('#newPasswordInput')?.value.trim();
+  if (!supabaseClient) return toast('请先保存 Supabase 配置');
+  const password = readNewPassword();
   if (!password || password.length < 6) return toast('新密码至少 6 位');
+  if (isAuthConfirmVisible() && password !== elements.authPasswordConfirmInput.value.trim()) {
+    return toast('两次输入的密码不一致');
+  }
+  if (!currentSession?.user) {
+    await recoverPasswordSessionFromUrl();
+  }
+  if (!currentSession?.user) return toast('重置链接还在校验，或已经过期，请重新发送邮件');
   try {
     const { error } = await supabaseClient.auth.updateUser({ password });
     if (error) throw error;
-    document.querySelector('#newPasswordInput').value = '';
+    const newPasswordInput = document.querySelector('#newPasswordInput');
+    if (newPasswordInput) newPasswordInput.value = '';
+    if (elements.authPasswordInput) elements.authPasswordInput.value = '';
+    if (elements.authPasswordConfirmInput) elements.authPasswordConfirmInput.value = '';
     passwordResetMode = false;
+    authMode = 'signin';
     clearPasswordResetUrl();
     toast('密码已更新');
     render();
@@ -1364,6 +1408,60 @@ function getPasswordResetRedirectUrl() {
   return 'https://deelbran-7.github.io/zuanmi-record/';
 }
 
+async function recoverPasswordSessionFromUrl() {
+  if (!supabaseClient) return null;
+  const recoveryInfo = getPasswordRecoveryInfo(window.location.href);
+  if (!recoveryInfo.hasRecovery) return currentSession;
+  passwordResetMode = true;
+  authMode = 'reset';
+  if (recoveryInfo.errorDescription) {
+    toast(`重置链接失效：${recoveryInfo.errorDescription}`);
+    return null;
+  }
+  if (passwordRecoveryPromise) return passwordRecoveryPromise;
+  passwordRecoveryPromise = (async () => {
+    try {
+      let session = null;
+      if (recoveryInfo.code) {
+        const { data, error } = await supabaseClient.auth.exchangeCodeForSession(recoveryInfo.code);
+        if (error) throw error;
+        session = data.session;
+      } else if (recoveryInfo.accessToken && recoveryInfo.refreshToken) {
+        const { data, error } = await supabaseClient.auth.setSession({
+          access_token: recoveryInfo.accessToken,
+          refresh_token: recoveryInfo.refreshToken,
+        });
+        if (error) throw error;
+        session = data.session;
+      } else {
+        const { data, error } = await supabaseClient.auth.getSession();
+        if (error) throw error;
+        session = data.session;
+      }
+      if (session?.user) {
+        currentView = 'sync';
+        await handleCloudSession(session);
+        toast('请输入新密码');
+      } else {
+        render();
+      }
+      return session;
+    } catch (error) {
+      const fallback = await supabaseClient.auth.getSession().catch(() => null);
+      const fallbackSession = fallback?.data?.session;
+      if (fallbackSession?.user) {
+        currentView = 'sync';
+        await handleCloudSession(fallbackSession);
+        toast('请输入新密码');
+        return fallbackSession;
+      }
+      toast(`重置链接校验失败：${error.message || '请重新发送邮件'}`);
+      return null;
+    }
+  })();
+  return passwordRecoveryPromise;
+}
+
 function clearPasswordResetUrl() {
   if (!window.history?.replaceState || (!window.location.hash && !window.location.search)) return;
   try {
@@ -1374,6 +1472,15 @@ function clearPasswordResetUrl() {
   } catch {
     // URL cleanup is cosmetic; password update has already succeeded.
   }
+}
+
+function readNewPassword() {
+  const gatePassword = !elements.authGate.hidden && authMode === 'reset' ? elements.authPasswordInput?.value : '';
+  return (document.querySelector('#newPasswordInput')?.value || gatePassword || '').trim();
+}
+
+function isAuthConfirmVisible() {
+  return !elements.authGate.hidden && authMode === 'reset' && elements.authConfirmField && !elements.authConfirmField.hidden;
 }
 
 async function uploadCloudState() {
@@ -1658,7 +1765,7 @@ function escapeAttr(value) {
 
 function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=34').then((registration) => {
+    navigator.serviceWorker.register('./sw.js?v=35').then((registration) => {
       registration.update().catch(() => {});
     }).catch(() => {});
   }
