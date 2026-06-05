@@ -763,6 +763,14 @@ h3 {
   color: var(--gold);
 }
 
+.cash-pool-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-top: 2px;
+}
+
 .cash-pool-card:hover,
 .cash-pool-card:focus-visible {
   transform: none;

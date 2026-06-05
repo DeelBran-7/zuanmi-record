@@ -192,9 +192,20 @@ function normalizeState(input) {
   const records = Array.isArray(input.records) ? normalizeRecords(input.records) : [];
   return {
     settings: { ...settings, sync: resolveSyncSettings(settings.sync, publicSyncConfig) },
-    assets: Array.isArray(input.assets) ? normalizeAssetOrder(input.assets) : [],
+    assets: Array.isArray(input.assets) ? normalizeAssets(input.assets) : [],
     records,
   };
+}
+
+function normalizeAssets(assets) {
+  return normalizeAssetOrder(assets.map((asset) => {
+    if (!isCashAccountAsset(asset)) return asset;
+    return { ...asset, category: 'cash' };
+  }));
+}
+
+function isCashAccountAsset(asset) {
+  return asset?.category === 'cash' || /当前存款|现金池|现金账户|银行卡|微信零钱|支付宝余额|revolute\s*现金/i.test(String(asset?.name || ''));
 }
 
 function normalizeRecords(records) {
@@ -252,7 +263,7 @@ function renderDashboard() {
   const summary = getPortfolio();
   const yearSummary = getYear();
   const recentRecords = getSortedRecords().slice(0, 6);
-  const activeAssets = summary.assets.filter((asset) => asset.status !== 'archived');
+  const activeAssets = summary.assets.filter((asset) => asset.status !== 'archived' && asset.assetClass !== 'cash');
 
   elements.views.dashboard.innerHTML = `
     <div class="dashboard-grid">
@@ -307,6 +318,7 @@ function renderDashboard() {
             <button class="ghost-button" data-action="new-asset">新增</button>
           </div>
           <div class="asset-list">
+            ${renderCashPoolCard(summary)}
             ${activeAssets.map(renderAssetCard).join('') || empty('还没有资产项目，点“新增”创建你的第一项资产')}
           </div>
         </section>
@@ -347,9 +359,9 @@ function renderAssets() {
         </div>
         <button class="primary-button" data-action="new-asset">新增资产</button>
       </div>
+      ${renderCashGroup(portfolio, cashSummaries)}
       ${renderAssetGroup('实体 / 现金流资产', '分红、工资、汇率差和业务回款会进入总营收或现金流。', cashflowSummaries, '还没有实体或现金流资产')}
       ${renderAssetGroup('投资账户资产', '股票、黄金、基金、Crypto 的账户内收益进入投资盈亏，不混入总营收。', investmentSummaries, '还没有投资账户资产')}
-      ${renderCashGroup(portfolio, cashSummaries)}
     </section>
     <section class="panel archive-panel">
       <div class="panel-header">
@@ -372,13 +384,12 @@ function renderCashGroup(portfolio, cashSummaries) {
       <div class="asset-group-header">
         <div>
           <h3>当前存款 / 现金池</h3>
-          <p class="small-muted">实体收入、分红和消费会自动汇总到现金池；银行卡、钱包余额可以另建现金账户。</p>
+          <p class="small-muted">实体收入、分红、外来转账和现金消费都会汇总到这里。</p>
         </div>
-        <span class="asset-count">${cashSummaries.length + 1}</span>
+        <span class="asset-count">${cashSummaries.length}</span>
       </div>
       <div class="asset-list">
         ${renderCashPoolCard(portfolio)}
-        ${cashSummaries.map(renderAssetCard).join('') || empty('还没有手动现金账户，可先只用上面的自动现金池')}
       </div>
     </div>
   `;
@@ -390,18 +401,22 @@ function renderCashPoolCard(portfolio) {
       <div class="asset-identity">
         <span class="asset-icon cash">现</span>
         <div>
-          <strong>当前存款（自动现金池）</strong>
-          <div class="asset-meta">收入先进来，消费从这里扣</div>
+          <strong>当前存款</strong>
+          <div class="asset-meta">自动现金池 + 手动现金账户</div>
         </div>
       </div>
       <div class="asset-note">
-        <div class="asset-meta">自动现金池 ${formatCurrency(portfolio.settledCash)} · 手动现金账户 ${formatCurrency(portfolio.cashAssetsValue)}</div>
-        <div class="asset-meta">总营收保留历史，当前存款只代表现在还剩的现金。</div>
+        <div class="asset-meta">自动现金池 ${formatCurrency(portfolio.settledCash)} · 已合并存款账户 ${formatCurrency(portfolio.cashAssetsValue)}</div>
+        <div class="asset-meta">别人转账、工资入账、消费扣款，都可以直接记到这里。</div>
       </div>
       <div class="asset-values">
         <strong>${formatCurrency(portfolio.currentCash)}</strong>
         <div class="asset-meta">现金池合计</div>
         <div class="${portfolio.currentCash >= 0 ? 'profit' : 'loss'}">可用现金 ${signedCurrency(portfolio.currentCash)}</div>
+      </div>
+      <div class="cash-pool-actions">
+        <button class="primary-button" data-action="cash-income">收入/转入</button>
+        <button class="ghost-button" data-action="cash-expense">消费/支出</button>
       </div>
     </article>
   `;
@@ -528,8 +543,8 @@ function renderHelp() {
         </div>
       </div>
       <div class="help-grid">
-        ${helpCard('1', '先建资产', '在“资产”里新增项目。实体项目、股票黄金、当前存款要分开建，现金池会自动承接实体收入和消费。')}
-        ${helpCard('2', '再记流水', '实体项目记分红/盈利会进入当前存款；记花掉/消费会从当前存款扣。股票黄金收益默认留在账户里。')}
+        ${helpCard('1', '先建资产', '在“资产”里新增项目。实体项目、股票黄金要分开建；当前存款会合并显示在最上方现金池。')}
+        ${helpCard('2', '再记流水', '实体项目记分红/盈利会进入当前存款；别人转账或现金消费，也可以用现金池上的快捷入口直接记录。')}
         ${helpCard('3', '看总览', '“总览”看目前资产、当前存款、目标进度、总营收、已花掉和投资盈亏，适合每天快速看一眼。')}
         ${helpCard('4', '看年度', '“年度”按年份回看。点“+ 年份”可以新增 2028、2029 或之后的目标。')}
         ${helpCard('5', '看资产详情', '点进每个资产，可以看按月趋势、年度汇总、类型占比和原始记录，记录很多也不用一条条翻。')}
@@ -868,10 +883,43 @@ function populateRecordForm(assetId = '') {
   if (assetId) assetSelect.value = assetId;
 }
 
-function openRecordDialog(assetId = '') {
+function openRecordDialog(assetId = '', type = '') {
   elements.recordForm.reset();
   populateRecordForm(assetId);
+  if (type && elements.recordForm.elements.type.querySelector(`option[value="${type}"]`)) {
+    elements.recordForm.elements.type.value = type;
+  }
   elements.recordDialog.showModal();
+}
+
+function openCashRecordDialog(type) {
+  const asset = ensurePrimaryCashAsset();
+  openRecordDialog(asset.id, type);
+}
+
+function ensurePrimaryCashAsset() {
+  let asset = state.assets.find((item) => item.status !== 'archived' && isCashAccountAsset(item));
+  if (asset) {
+    if (asset.category !== 'cash') {
+      asset.category = 'cash';
+      state.assets = normalizeAssetOrder(state.assets);
+      saveState();
+    }
+    return asset;
+  }
+  asset = {
+    id: `asset-cash-${Date.now()}`,
+    name: '当前存款',
+    category: 'cash',
+    currency: 'CNY',
+    status: 'active',
+    note: '现金池手动入口',
+    displayOrder: nextAssetDisplayOrder(),
+  };
+  state.assets.push(asset);
+  state.assets = normalizeAssetOrder(state.assets);
+  saveState();
+  return state.assets.find((item) => item.id === asset.id) || asset;
 }
 
 function handleRecordSubmit(event) {
@@ -993,6 +1041,8 @@ function bindCommonActions(root) {
       if (action !== 'asset-detail') event.stopPropagation();
       if (action === 'new-record') openRecordDialog();
       if (action === 'new-record-for-asset') openRecordDialog(element.dataset.assetId);
+      if (action === 'cash-income') openCashRecordDialog('realized_profit');
+      if (action === 'cash-expense') openCashRecordDialog('expense');
       if (action === 'new-asset') openAssetDialog();
       if (action === 'asset-detail') renderAssetDetail(element.dataset.assetId);
       if (action === 'year-view') switchView('year');
@@ -1765,7 +1815,7 @@ function escapeAttr(value) {
 
 function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=35').then((registration) => {
+    navigator.serviceWorker.register('./sw.js?v=36').then((registration) => {
       registration.update().catch(() => {});
     }).catch(() => {});
   }

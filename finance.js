@@ -357,5 +357,9 @@ function isInvestmentAsset(asset) {
 }
 
 function isCashAsset(asset) {
-  return asset.category === 'cash';
+  return asset.category === 'cash' || isCurrentDepositName(asset.name);
+}
+
+function isCurrentDepositName(name = '') {
+  return /当前存款|现金池|现金账户|银行卡|微信零钱|支付宝余额|revolute\s*现金/i.test(String(name || ''));
 }
