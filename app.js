@@ -1552,7 +1552,7 @@ function escapeAttr(value) {
 
 function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=31').then((registration) => {
+    navigator.serviceWorker.register('./sw.js?v=32').then((registration) => {
       registration.update().catch(() => {});
     }).catch(() => {});
   }
