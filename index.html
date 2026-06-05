@@ -3,26 +3,45 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#101828">
+    <meta name="theme-color" content="#101010">
     <title>赚米记录</title>
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=30">
+    <link rel="stylesheet" href="./styles.css?v=31">
   </head>
   <body>
     <section class="auth-gate" id="authGate" hidden>
       <div class="auth-card">
-        <p class="eyebrow">赚米记录</p>
-        <h1>先登录，再记账</h1>
-        <p class="small-muted">每个邮箱都是独立账本。第一次用邮箱和密码注册，以后直接登录。</p>
-        <div class="auth-fields">
-          <label>邮箱<input id="authEmailInput" type="email" autocomplete="email" placeholder="you@example.com"></label>
-          <label>密码<input id="authPasswordInput" type="password" autocomplete="current-password" placeholder="至少 6 位"></label>
+        <div class="auth-brand-panel">
+          <p class="eyebrow">赚米记录</p>
+          <h1>你的资产账本，先安全打开。</h1>
+          <p>每个邮箱对应独立账本，登录后手机、电脑都能同步。数据按账号隔离，不会混到别人的账本里。</p>
+          <div class="auth-feature-list">
+            <span>邮箱密码登录</span>
+            <span>多设备同步</span>
+            <span>独立私密账本</span>
+          </div>
         </div>
-        <div class="button-row">
-          <button class="primary-button" id="authSignInButton" type="button">登录</button>
-          <button class="ghost-button" id="authSignUpButton" type="button">注册</button>
+        <div class="auth-form-panel">
+          <div class="auth-mode-switch" aria-label="登录或注册">
+            <button class="auth-mode-button active" type="button" data-auth-mode="signin">登录</button>
+            <button class="auth-mode-button" type="button" data-auth-mode="signup">创建账号</button>
+          </div>
+          <p class="eyebrow">账号入口</p>
+          <h2 id="authTitle">登录账本</h2>
+          <p class="small-muted" id="authSubtitle">输入邮箱和密码，打开你自己的云端账本。</p>
+          <div class="auth-fields">
+            <label>邮箱<input id="authEmailInput" type="email" autocomplete="email" placeholder="you@example.com"></label>
+            <label>密码<input id="authPasswordInput" type="password" autocomplete="current-password" placeholder="至少 6 位"></label>
+            <label id="authConfirmField" hidden>确认密码<input id="authPasswordConfirmInput" type="password" autocomplete="new-password" placeholder="再输入一次密码"></label>
+          </div>
+          <div class="button-row">
+            <button class="primary-button" id="authSignInButton" type="button">登录</button>
+            <button class="primary-button" id="authSignUpButton" type="button" hidden>创建账号</button>
+            <button class="ghost-button" id="authModeToggle" type="button">创建新账号</button>
+          </div>
+          <button class="text-button" id="authForgotPasswordButton" type="button">忘记密码？发送重置邮件</button>
+          <p class="small-muted auth-note" id="authModeHint">第一次使用请切到“创建账号”，注册成功后会自动进入你的空账本。</p>
         </div>
-        <button class="text-button" id="authForgotPasswordButton" type="button">忘记密码？发送重置邮件</button>
       </div>
     </section>
 
@@ -208,7 +227,7 @@
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="./site-config.js?v=30"></script>
-    <script type="module" src="./app.js?v=30"></script>
+    <script src="./site-config.js?v=31"></script>
+    <script type="module" src="./app.js?v=31"></script>
   </body>
 </html>

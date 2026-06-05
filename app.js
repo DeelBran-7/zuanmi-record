@@ -86,14 +86,22 @@ let autoCloudDownloadUserId = null;
 let reorderAssetId = null;
 let longPressTimer = null;
 let passwordResetMode = false;
+let authMode = 'signin';
 
 const elements = {
   appShell: document.querySelector('#appShell'),
   authGate: document.querySelector('#authGate'),
   authEmailInput: document.querySelector('#authEmailInput'),
   authPasswordInput: document.querySelector('#authPasswordInput'),
+  authPasswordConfirmInput: document.querySelector('#authPasswordConfirmInput'),
   authSignInButton: document.querySelector('#authSignInButton'),
   authSignUpButton: document.querySelector('#authSignUpButton'),
+  authModeToggle: document.querySelector('#authModeToggle'),
+  authModeButtons: document.querySelectorAll('[data-auth-mode]'),
+  authConfirmField: document.querySelector('#authConfirmField'),
+  authTitle: document.querySelector('#authTitle'),
+  authSubtitle: document.querySelector('#authSubtitle'),
+  authModeHint: document.querySelector('#authModeHint'),
   authForgotPasswordButton: document.querySelector('#authForgotPasswordButton'),
   yearStrip: document.querySelector('#yearStrip'),
   tabs: document.querySelectorAll('.tab-button'),
@@ -126,6 +134,8 @@ function init() {
   document.querySelector('#exportButton').addEventListener('click', exportState);
   elements.authSignInButton?.addEventListener('click', signInWithPassword);
   elements.authSignUpButton?.addEventListener('click', signUpWithPassword);
+  elements.authModeToggle?.addEventListener('click', () => setAuthMode(authMode === 'signin' ? 'signup' : 'signin'));
+  elements.authModeButtons.forEach((button) => button.addEventListener('click', () => setAuthMode(button.dataset.authMode)));
   elements.authForgotPasswordButton?.addEventListener('click', requestPasswordReset);
   elements.tabs.forEach((button) => button.addEventListener('click', () => switchView(button.dataset.view)));
   elements.recordForm.addEventListener('submit', handleRecordSubmit);
@@ -143,6 +153,7 @@ function init() {
     }
   });
   registerServiceWorker();
+  setAuthMode('signin');
   initSupabaseClient();
   render();
   showOnboardingIfNeeded();
@@ -1029,7 +1040,37 @@ function updateAuthGate() {
   if (showGate && state.settings.sync.email && !elements.authEmailInput.value) {
     elements.authEmailInput.value = state.settings.sync.email;
   }
+  if (showGate) setAuthMode(authMode);
   if (showGate) elements.onboardingDialog.close();
+}
+
+function setAuthMode(mode) {
+  authMode = mode === 'signup' ? 'signup' : 'signin';
+  const isSignUp = authMode === 'signup';
+  elements.authModeButtons.forEach((button) => {
+    button.classList.toggle('active', button.dataset.authMode === authMode);
+  });
+  if (elements.authTitle) elements.authTitle.textContent = isSignUp ? '创建账号' : '登录账本';
+  if (elements.authSubtitle) {
+    elements.authSubtitle.textContent = isSignUp
+      ? '用邮箱创建你的独立账本。注册成功后，这个邮箱就是你的同步账号。'
+      : '输入邮箱和密码，打开你自己的云端账本。';
+  }
+  if (elements.authModeHint) {
+    elements.authModeHint.textContent = isSignUp
+      ? '不会跳去外部注册页；账号会直接创建在当前应用里。'
+      : '第一次使用请切到“创建账号”，注册成功后会自动进入你的空账本。';
+  }
+  if (elements.authPasswordInput) {
+    elements.authPasswordInput.autocomplete = isSignUp ? 'new-password' : 'current-password';
+    elements.authPasswordInput.placeholder = isSignUp ? '至少 6 位，建议不要和邮箱密码相同' : '至少 6 位';
+  }
+  if (elements.authPasswordConfirmInput && !isSignUp) elements.authPasswordConfirmInput.value = '';
+  if (elements.authConfirmField) elements.authConfirmField.hidden = !isSignUp;
+  if (elements.authSignInButton) elements.authSignInButton.hidden = isSignUp;
+  if (elements.authSignUpButton) elements.authSignUpButton.hidden = !isSignUp;
+  if (elements.authModeToggle) elements.authModeToggle.textContent = isSignUp ? '已有账号，去登录' : '创建新账号';
+  if (elements.authForgotPasswordButton) elements.authForgotPasswordButton.hidden = isSignUp;
 }
 
 function requiresLogin() {
@@ -1141,6 +1182,9 @@ async function signUpWithPassword() {
   const password = readAuthPassword();
   if (!email || !password) return toast('请输入邮箱和密码');
   if (password.length < 6) return toast('密码至少 6 位');
+  if (!elements.authConfirmField?.hidden && elements.authPasswordConfirmInput && password !== elements.authPasswordConfirmInput.value.trim()) {
+    return toast('两次输入的密码不一致');
+  }
   try {
     const { data, error } = await supabaseClient.auth.signUp({ email, password });
     if (error) throw error;
@@ -1160,11 +1204,13 @@ async function signUpWithPassword() {
 }
 
 function readAuthEmail() {
-  return normalizeEmail(elements.authEmailInput?.value || document.querySelector('#emailOtpInput')?.value || state.settings.sync.email);
+  const gateEmail = elements.authGate.hidden ? '' : elements.authEmailInput?.value;
+  return normalizeEmail(gateEmail || document.querySelector('#emailOtpInput')?.value || state.settings.sync.email);
 }
 
 function readAuthPassword() {
-  return (elements.authPasswordInput?.value || document.querySelector('#passwordInput')?.value || '').trim();
+  const gatePassword = elements.authGate.hidden ? '' : elements.authPasswordInput?.value;
+  return (gatePassword || document.querySelector('#passwordInput')?.value || '').trim();
 }
 
 function writeAuthEmail(email) {
@@ -1506,7 +1552,7 @@ function escapeAttr(value) {
 
 function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=30').then((registration) => {
+    navigator.serviceWorker.register('./sw.js?v=31').then((registration) => {
       registration.update().catch(() => {});
     }).catch(() => {});
   }
