@@ -9,11 +9,13 @@
   --line-soft: #edf1f5;
   --green: #101828;
   --green-2: #2563eb;
+  --cyan: #06b6d4;
   --profit: #168253;
   --loss: #d92d20;
   --gold: #b7f34a;
   --blue: #2563eb;
   --shadow: 0 18px 38px rgba(16, 24, 40, 0.08);
+  --shadow-strong: 0 28px 70px rgba(16, 24, 40, 0.16);
 }
 
 * {
@@ -22,7 +24,14 @@
 
 body {
   margin: 0;
-  background: var(--bg);
+  min-height: 100vh;
+  background-color: var(--bg);
+  background-image:
+    linear-gradient(115deg, rgba(37, 99, 235, 0.10), transparent 32%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(244, 246, 248, 0.84)),
+    linear-gradient(rgba(16, 24, 40, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(16, 24, 40, 0.035) 1px, transparent 1px);
+  background-size: auto, auto, 28px 28px, 28px 28px;
   color: var(--ink);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   letter-spacing: 0;
@@ -64,10 +73,11 @@ button {
 .auth-card {
   width: min(440px, 100%);
   padding: 24px;
-  border: 1px solid var(--line);
+  border: 1px solid rgba(226, 232, 240, 0.86);
   border-radius: 8px;
-  background: var(--card);
-  box-shadow: var(--shadow);
+  background: rgba(255, 255, 255, 0.90);
+  box-shadow: var(--shadow-strong);
+  backdrop-filter: blur(18px);
 }
 
 .auth-card h1 {
@@ -146,17 +156,29 @@ h3 {
   background: var(--card);
   color: var(--ink);
   padding: 9px 12px;
+  transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease, background 140ms ease;
 }
 
 .primary-button {
-  background: var(--green-2);
-  border-color: var(--green-2);
+  background: linear-gradient(135deg, var(--blue), var(--cyan));
+  border-color: rgba(37, 99, 235, 0.42);
   color: white;
   font-weight: 700;
+  box-shadow: 0 12px 24px rgba(37, 99, 235, 0.22);
 }
 
 .ghost-button {
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.84);
+}
+
+.primary-button:hover,
+.ghost-button:hover,
+.chip:hover,
+.tab-button:hover,
+.icon-button:hover {
+  transform: translateY(-1px);
+  border-color: rgba(37, 99, 235, 0.38);
+  box-shadow: 0 12px 26px rgba(16, 24, 40, 0.08);
 }
 
 .danger-button {
@@ -182,9 +204,10 @@ h3 {
 
 .chip.active,
 .tab-button.active {
-  background: var(--green);
-  border-color: var(--green);
+  background: #101828;
+  border-color: rgba(16, 24, 40, 0.82);
   color: white;
+  box-shadow: 0 10px 22px rgba(16, 24, 40, 0.16);
 }
 
 .year-strip {
@@ -197,8 +220,13 @@ h3 {
   z-index: 2;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  padding: 8px 0 14px;
-  background: linear-gradient(var(--bg) 85%, rgba(238, 243, 242, 0));
+  padding: 8px;
+  margin-bottom: 14px;
+  border: 1px solid rgba(226, 232, 240, 0.92);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 18px 42px rgba(16, 24, 40, 0.07);
+  backdrop-filter: blur(18px);
 }
 
 .tab-button {
@@ -232,11 +260,47 @@ h3 {
 }
 
 .hero-card {
-  background: var(--green);
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(135deg, #101828 0%, #172033 48%, #0b1220 100%);
   color: white;
-  padding: 20px;
-  box-shadow: var(--shadow);
-  border-color: rgba(16, 24, 40, 0.2);
+  padding: 22px;
+  box-shadow: var(--shadow-strong);
+  border-color: rgba(255, 255, 255, 0.10);
+}
+
+.hero-card::before,
+.hero-card::after {
+  position: absolute;
+  content: "";
+  pointer-events: none;
+}
+
+.hero-card::before {
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px),
+    linear-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+  background-size: 34px 34px;
+  mask-image: linear-gradient(125deg, transparent 18%, #000 60%, transparent 100%);
+}
+
+.hero-card::after {
+  right: -52px;
+  bottom: -76px;
+  width: 210px;
+  height: 210px;
+  border: 1px solid rgba(183, 243, 74, 0.26);
+  transform: rotate(18deg);
+  background:
+    repeating-linear-gradient(90deg, rgba(183, 243, 74, 0.16) 0 2px, transparent 2px 16px);
+  opacity: 0.74;
+}
+
+.hero-card > * {
+  position: relative;
+  z-index: 1;
 }
 
 .hero-top {
@@ -249,9 +313,10 @@ h3 {
 
 .hero-number {
   margin: 8px 0 10px;
-  font-size: 42px;
+  font-size: 44px;
   font-weight: 830;
   line-height: 1;
+  text-shadow: 0 12px 30px rgba(0, 0, 0, 0.28);
 }
 
 .progress-track {
@@ -264,7 +329,8 @@ h3 {
 .progress-fill {
   height: 100%;
   border-radius: inherit;
-  background: var(--gold);
+  background: linear-gradient(90deg, var(--gold), #67e8f9);
+  box-shadow: 0 0 18px rgba(183, 243, 74, 0.48);
 }
 
 .hero-meta {
@@ -285,6 +351,19 @@ h3 {
 
 .metric-card {
   padding: 13px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 10px 28px rgba(16, 24, 40, 0.05);
+}
+
+.metric-card::before {
+  position: absolute;
+  content: "";
+  left: 0;
+  top: 0;
+  width: 3px;
+  height: 100%;
+  background: linear-gradient(180deg, var(--blue), var(--gold));
 }
 
 .metric-card small {
@@ -307,9 +386,11 @@ h3 {
 }
 
 .panel {
-  padding: 15px;
+  padding: 16px;
   margin-bottom: 14px;
-  box-shadow: 0 8px 24px rgba(31, 41, 51, 0.04);
+  box-shadow: 0 16px 40px rgba(16, 24, 40, 0.06);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(14px);
 }
 
 .compact-panel {
@@ -357,12 +438,20 @@ h3 {
   text-align: left;
   cursor: pointer;
   user-select: none;
+  box-shadow: 0 8px 22px rgba(16, 24, 40, 0.04);
+  transition: transform 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
 }
 
 .asset-card:hover,
 .asset-card:focus-visible,
 .record-row:hover {
-  border-color: #bfc8bd;
+  border-color: rgba(37, 99, 235, 0.35);
+}
+
+.asset-card:hover,
+.asset-card:focus-visible {
+  transform: translateY(-1px);
+  box-shadow: 0 16px 34px rgba(16, 24, 40, 0.09);
 }
 
 .asset-card.reordering {
@@ -492,9 +581,18 @@ textarea {
   min-height: 42px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #fff;
+  background: rgba(255, 255, 255, 0.88);
   color: var(--ink);
   padding: 10px;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: rgba(37, 99, 235, 0.62);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
 }
 
 textarea {
@@ -519,11 +617,12 @@ textarea {
 
 .modal-card {
   width: 100%;
-  border: 1px solid var(--line);
+  border: 1px solid rgba(226, 232, 240, 0.92);
   border-radius: 14px;
-  background: var(--panel);
+  background: rgba(255, 255, 255, 0.94);
   padding: 18px;
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-strong);
+  backdrop-filter: blur(18px);
 }
 
 .modal-header {
