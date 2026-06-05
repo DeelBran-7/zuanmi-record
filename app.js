@@ -399,7 +399,7 @@ function renderCashPoolCard(portfolio) {
   return `
     <article class="asset-card cash-pool-card" aria-label="当前存款自动现金池">
       <div class="asset-identity">
-        <span class="asset-icon cash">现</span>
+        <span class="asset-icon cash-pool-icon">存</span>
         <div>
           <strong>当前存款</strong>
           <div class="asset-meta">自动现金池 + 手动现金账户</div>
@@ -1815,7 +1815,7 @@ function escapeAttr(value) {
 
 function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=36').then((registration) => {
+    navigator.serviceWorker.register('./sw.js?v=37').then((registration) => {
       registration.update().catch(() => {});
     }).catch(() => {});
   }

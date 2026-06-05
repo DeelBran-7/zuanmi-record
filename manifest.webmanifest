@@ -1,6 +1,6 @@
 {
-  "name": "赚米记录",
-  "short_name": "赚米记录",
+  "name": "资产账本",
+  "short_name": "资产账本",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#f4f6f8",
