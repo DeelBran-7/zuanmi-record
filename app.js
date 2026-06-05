@@ -224,7 +224,7 @@ function renderDashboard() {
         <div class="metric-grid">
           ${metric('总营收', formatCurrency(summary.grossRevenue))}
           ${metric('已花掉', formatCurrency(summary.spent), summary.spent > 0 ? 'loss' : '')}
-          ${metric('黄金浮盈', summary.goldFloatingProfit ? signedCurrency(summary.goldFloatingProfit) : '待金价', summary.goldFloatingProfit >= 0 ? 'profit' : 'loss')}
+          ${metric('投资盈亏', signedCurrency(summary.investmentProfit), summary.investmentProfit >= 0 ? 'profit' : 'loss')}
         </div>
 
         <section class="panel compact-panel">
@@ -324,8 +324,9 @@ function renderYear() {
         ${metric('目前资产', formatCurrency(summary.totalAssets))}
         ${metric('总营收', formatCurrency(summary.grossRevenue))}
         ${metric('已花掉', formatCurrency(summary.spent), summary.spent > 0 ? 'loss' : '')}
+        ${metric('投资盈亏', signedCurrency(summary.investmentProfit), summary.investmentProfit >= 0 ? 'profit' : 'loss')}
         ${metric('年度净投入', formatCurrency(summary.netContribution))}
-        ${metric('留存收益', signedCurrency(summary.trueProfit), summary.trueProfit >= 0 ? 'profit' : 'loss')}
+        ${metric('净增长', signedCurrency(summary.trueProfit), summary.trueProfit >= 0 ? 'profit' : 'loss')}
       </div>
       <div class="month-list">
         ${summary.months.map(renderMonthRow).join('')}
@@ -406,6 +407,8 @@ function renderAssetCard(assetSummary) {
   const asset = state.assets.find((item) => item.id === assetSummary.assetId) || assetSummary;
   const pillClass = asset.status === 'archived' ? 'archived' : asset.status === 'paused' ? 'paused' : '';
   const isReordering = reorderAssetId === assetSummary.assetId;
+  const performanceLabel = assetSummary.assetClass === 'investment' ? '账户盈亏' : assetSummary.assetClass === 'cash' ? '现金增减' : '现金流';
+  const performanceValue = assetSummary.assetClass === 'investment' ? assetSummary.investmentProfit : assetSummary.retainedRevenue;
   return `
     <article class="asset-card ${isReordering ? 'reordering' : ''}" data-action="asset-detail" data-asset-id="${assetSummary.assetId}" tabindex="0" role="button" aria-label="${escapeAttr(assetSummary.name)} 详情">
       <div class="asset-identity">
@@ -422,7 +425,7 @@ function renderAssetCard(assetSummary) {
       <div class="asset-values">
         <strong>${formatCurrency(assetSummary.currentValue, asset.currency)}</strong>
         <div class="asset-meta">本金 ${formatCurrency(assetSummary.principal, asset.currency)}</div>
-        <div class="${assetSummary.retainedRevenue >= 0 ? 'profit' : 'loss'}">留存 ${signedCurrency(assetSummary.retainedRevenue, asset.currency)}</div>
+        <div class="${performanceValue >= 0 ? 'profit' : 'loss'}">${performanceLabel} ${signedCurrency(performanceValue, asset.currency)}</div>
       </div>
       ${isReordering ? `
         <div class="reorder-controls">
@@ -503,15 +506,15 @@ function renderAssetDetail(assetId) {
       <div class="hero-number">${formatCurrency(summary.currentValue, asset.currency)}</div>
       <div class="hero-meta">
         <span>本金 ${formatCurrency(summary.principal, asset.currency)}</span>
-        <span>留存收益 ${signedCurrency(summary.retainedRevenue, asset.currency)}</span>
+        <span>${summary.assetClass === 'investment' ? '账户盈亏' : '现金流'} ${signedCurrency(summary.assetClass === 'investment' ? summary.investmentProfit : summary.retainedRevenue, asset.currency)}</span>
       </div>
     </article>
     <div class="metric-grid">
       ${metric('投入本金', formatCurrency(summary.capitalIn, asset.currency))}
       ${metric('回款/取出', formatCurrency(summary.capitalOut, asset.currency))}
-      ${metric('总营收', formatCurrency(summary.grossRevenue, asset.currency))}
+      ${metric(summary.assetClass === 'investment' ? '账户内收益' : '总营收', formatCurrency(summary.grossRevenue, asset.currency))}
       ${metric('已花掉', formatCurrency(summary.spent, asset.currency), summary.spent > 0 ? 'loss' : '')}
-      ${metric('留存收益率', summary.principal ? formatPercent((summary.retainedRevenue / summary.principal) * 100) : '0%')}
+      ${metric(summary.assetClass === 'investment' ? '账户收益率' : '现金流率', summary.principal ? formatPercent(((summary.assetClass === 'investment' ? summary.investmentProfit : summary.retainedRevenue) / summary.principal) * 100) : '0%')}
     </div>
     ${goldHtml}
     <section class="panel">
@@ -1273,7 +1276,7 @@ function escapeAttr(value) {
 
 function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=25').then((registration) => {
+    navigator.serviceWorker.register('./sw.js?v=26').then((registration) => {
       registration.update().catch(() => {});
     }).catch(() => {});
   }

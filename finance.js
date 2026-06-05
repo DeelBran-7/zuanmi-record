@@ -49,6 +49,8 @@ export function getGoldSummary(asset, records, options = {}) {
 
 export function calculateAssetSummary(asset, records, options = {}) {
   const assetRecords = recordsForAsset(asset.id, records);
+  const isInvestment = isInvestmentAsset(asset);
+  const isCash = isCashAsset(asset);
   const capitalIn = money(sumByTypes(assetRecords, ['capital_in', 'gold_buy']));
   const capitalOut = money(sumByTypes(assetRecords, ['capital_out']));
   const grossRevenue = money(sumByTypes(assetRecords, ['realized_profit', 'dividend']));
@@ -59,20 +61,32 @@ export function calculateAssetSummary(asset, records, options = {}) {
 
   let currentValue;
   let floatingProfit = null;
+  let accountValue = null;
 
   if (asset.category === 'gold') {
-    currentValue = money(gold.currentValue - spent);
+    accountValue = gold.currentValue;
+    currentValue = money(accountValue - spent);
     floatingProfit = gold.floatingProfit;
   } else if (latestValuation !== null) {
-    currentValue = money(latestValuation - spent);
+    accountValue = money(latestValuation);
+    currentValue = isInvestment ? money(accountValue - spent) : accountValue;
+  } else if (isInvestment || isCash) {
+    accountValue = money(capitalIn - capitalOut + grossRevenue - realizedLoss);
+    currentValue = money(accountValue - spent);
   } else {
-    currentValue = money(capitalIn - capitalOut + grossRevenue - realizedLoss - spent);
+    accountValue = money(capitalIn - capitalOut - realizedLoss);
+    currentValue = accountValue;
   }
+
+  const settledCash = isCash ? 0 : money(capitalOut + (isInvestment ? 0 : grossRevenue) - (isInvestment ? 0 : spent));
+  const investmentProfit = isInvestment ? money((accountValue || 0) + capitalOut - capitalIn) : 0;
+  const assetClass = isInvestment ? 'investment' : isCash ? 'cash' : 'cashflow';
 
   return {
     assetId: asset.id,
     name: asset.name,
     category: asset.category,
+    assetClass,
     currency: asset.currency || 'CNY',
     status: asset.status || 'active',
     principal: money(capitalIn - capitalOut),
@@ -84,6 +98,8 @@ export function calculateAssetSummary(asset, records, options = {}) {
     spent,
     netRealized: money(grossRevenue - realizedLoss),
     retainedRevenue: money(grossRevenue - realizedLoss - spent),
+    settledCash,
+    investmentProfit,
     currentValue,
     floatingProfit,
     recordCount: assetRecords.length,
@@ -93,11 +109,16 @@ export function calculateAssetSummary(asset, records, options = {}) {
 
 export function calculatePortfolioSummary(assets, records, options = {}) {
   const assetSummaries = assets.map((asset) => calculateAssetSummary(asset, records, options));
-  const totalAssets = money(assetSummaries.reduce((sum, asset) => sum + cnyAmount(asset.currentValue, asset.currency), 0));
+  const settledCash = money(assetSummaries.reduce((sum, asset) => sum + cnyAmount(asset.settledCash, asset.currency), 0));
+  const totalAssets = money(assetSummaries.reduce((sum, asset) => sum + cnyAmount(asset.currentValue, asset.currency), settledCash));
   const principal = money(assetSummaries.reduce((sum, asset) => sum + cnyAmount(asset.principal, asset.currency), 0));
-  const grossRevenue = money(assetSummaries.reduce((sum, asset) => sum + cnyAmount(asset.grossRevenue, asset.currency), 0));
+  const cashFlowAssets = assetSummaries.filter((asset) => asset.assetClass !== 'investment');
+  const investmentAssets = assetSummaries.filter((asset) => asset.assetClass === 'investment');
+  const grossRevenue = money(cashFlowAssets.reduce((sum, asset) => sum + cnyAmount(asset.grossRevenue, asset.currency), 0));
+  const cashFlowProfit = money(cashFlowAssets.reduce((sum, asset) => sum + cnyAmount(asset.netRealized, asset.currency), 0));
   const realizedProfit = money(assetSummaries.reduce((sum, asset) => sum + cnyAmount(asset.netRealized, asset.currency), 0));
   const spent = money(assetSummaries.reduce((sum, asset) => sum + cnyAmount(asset.spent, asset.currency), 0));
+  const investmentProfit = money(investmentAssets.reduce((sum, asset) => sum + cnyAmount(asset.investmentProfit, asset.currency), 0));
   const goldFloatingProfit = money(assetSummaries.reduce((sum, asset) => {
     if (asset.category !== 'gold' || asset.floatingProfit === null) return sum;
     return sum + cnyAmount(asset.floatingProfit, asset.currency);
@@ -110,10 +131,13 @@ export function calculatePortfolioSummary(assets, records, options = {}) {
     totalAssets,
     principal,
     grossRevenue,
+    cashFlowProfit,
     realizedProfit,
     spent,
+    settledCash,
+    investmentProfit,
     goldFloatingProfit,
-    trueProfit: money(realizedProfit - spent + goldFloatingProfit),
+    trueProfit: money(cashFlowProfit - spent + investmentProfit),
     targetProgress: target > 0 ? money((totalAssets / target) * 100) : 0,
     targetRemaining: target > 0 ? money(Math.max(target - totalAssets, 0)) : 0,
     assets: assetSummaries,
@@ -219,4 +243,12 @@ function findLatestAmount(records, type) {
 function cnyAmount(value, currency) {
   if (currency === 'EUR') return Number(value) * 8;
   return Number(value) || 0;
+}
+
+function isInvestmentAsset(asset) {
+  return ['stock', 'gold', 'crypto', 'fund'].includes(asset.category);
+}
+
+function isCashAsset(asset) {
+  return asset.category === 'cash';
 }

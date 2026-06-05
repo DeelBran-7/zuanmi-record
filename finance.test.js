@@ -55,8 +55,9 @@ test('portfolio summary keeps realized profit separate from gold floating profit
 
   assert.equal(summary.totalAssets, 236000);
   assert.equal(summary.principal, 195123.16);
-  assert.equal(summary.grossRevenue, 40000);
+  assert.equal(summary.grossRevenue, 10000);
   assert.equal(summary.realizedProfit, 40000);
+  assert.equal(summary.investmentProfit, 30876.84);
   assert.equal(summary.goldFloatingProfit, 876.84);
   assert.equal(summary.targetProgress, 59);
 });
@@ -174,7 +175,31 @@ test('spending is deducted from gold and valuation based current assets', () => 
   ], { year: 2026, target: 400000, goldPricePerGram: 1000 });
 
   assert.equal(summary.assets.find((asset) => asset.assetId === 'gold').currentValue, 1900);
-  assert.equal(summary.assets.find((asset) => asset.assetId === 'valuation').currentValue, 4700);
+  assert.equal(summary.assets.find((asset) => asset.assetId === 'valuation').currentValue, 5000);
+  assert.equal(summary.settledCash, -300);
   assert.equal(summary.spent, 400);
   assert.equal(summary.totalAssets, 6600);
+});
+
+test('cashflow income settles into cash while investment gains stay inside accounts', () => {
+  const summary = calculatePortfolioSummary([
+    { id: 'business', name: '实体项目', category: 'business', currency: 'CNY', status: 'active' },
+    { id: 'stock', name: '股票账户', category: 'stock', currency: 'CNY', status: 'active' },
+  ], [
+    { id: 'business-capital', assetId: 'business', type: 'capital_in', amount: 100000, date: '2026-01-01' },
+    { id: 'business-dividend', assetId: 'business', type: 'dividend', amount: 10000, date: '2026-02-01' },
+    { id: 'business-spent', assetId: 'business', type: 'expense', amount: 3000, date: '2026-02-02' },
+    { id: 'stock-capital', assetId: 'stock', type: 'capital_in', amount: 90000, date: '2026-01-01' },
+    { id: 'stock-gain', assetId: 'stock', type: 'realized_profit', amount: 31550, date: '2026-03-01' },
+  ], { year: 2026, target: 400000, goldPricePerGram: 0 });
+
+  const business = summary.assets.find((asset) => asset.assetId === 'business');
+  const stock = summary.assets.find((asset) => asset.assetId === 'stock');
+
+  assert.equal(business.currentValue, 100000);
+  assert.equal(business.settledCash, 7000);
+  assert.equal(stock.currentValue, 121550);
+  assert.equal(summary.grossRevenue, 10000);
+  assert.equal(summary.investmentProfit, 31550);
+  assert.equal(summary.totalAssets, 228550);
 });
