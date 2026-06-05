@@ -17,6 +17,21 @@ const OWNER_KEY = 'zuanmi-record-owner-v1';
 const TROY_OUNCE_GRAMS = 31.1034768;
 const today = new Date().toISOString().slice(0, 10);
 const publicSyncConfig = getBrowserPublicSyncConfig();
+const ASSET_CATEGORY_OPTIONS = {
+  cashflow: [
+    { value: 'business', label: '业务/实体投资' },
+    { value: 'other', label: '其他实体资产' },
+  ],
+  investment: [
+    { value: 'stock', label: '股票账户' },
+    { value: 'gold', label: '黄金账户' },
+    { value: 'crypto', label: 'Crypto' },
+    { value: 'fund', label: '基金账户' },
+  ],
+  cash: [
+    { value: 'cash', label: '现金/工资/存款' },
+  ],
+};
 
 const defaultState = {
   settings: {
@@ -111,6 +126,7 @@ function init() {
   elements.tabs.forEach((button) => button.addEventListener('click', () => switchView(button.dataset.view)));
   elements.recordForm.addEventListener('submit', handleRecordSubmit);
   elements.assetForm.addEventListener('submit', handleAssetSubmit);
+  elements.assetForm.elements.assetClassHint?.addEventListener('change', syncAssetCategoryOptions);
   elements.importForm.addEventListener('submit', handleImportSubmit);
   elements.onboardingForm.addEventListener('submit', handleOnboardingSubmit);
   document.addEventListener('click', (event) => {
@@ -281,19 +297,22 @@ function renderAssets() {
     goldPricePerGram: state.settings.goldPricePerGram,
   }));
   const activeSummaries = summaries.filter((asset) => asset.status !== 'archived');
+  const cashflowSummaries = activeSummaries.filter((asset) => asset.assetClass === 'cashflow');
+  const investmentSummaries = activeSummaries.filter((asset) => asset.assetClass === 'investment');
+  const cashSummaries = activeSummaries.filter((asset) => asset.assetClass === 'cash');
   const archivedSummaries = summaries.filter((asset) => asset.status === 'archived');
   elements.views.assets.innerHTML = `
     <section class="panel">
       <div class="panel-header">
         <div>
           <h2>资产管理</h2>
-          <p class="small-muted">长按资产可调整顺序。归档只代表项目结束，资金仍计入目前资产。</p>
+          <p class="small-muted">资产按业务逻辑分组。长按资产可调整顺序，归档只代表项目结束。</p>
         </div>
         <button class="primary-button" data-action="new-asset">新增资产</button>
       </div>
-      <div class="asset-list">
-        ${activeSummaries.map(renderAssetCard).join('') || empty('还没有进行中的资产')}
-      </div>
+      ${renderAssetGroup('实体 / 现金流资产', '分红、工资、汇率差和业务回款会进入总营收或现金流。', cashflowSummaries, '还没有实体或现金流资产')}
+      ${renderAssetGroup('投资账户资产', '股票、黄金、基金、Crypto 的账户内收益进入投资盈亏，不混入总营收。', investmentSummaries, '还没有投资账户资产')}
+      ${renderAssetGroup('当前存款 / 收入账户', '工资、存款和备用金归在这里，用来承接实体项目留下来的钱。', cashSummaries, '还没有当前存款或收入账户')}
     </section>
     <section class="panel archive-panel">
       <div class="panel-header">
@@ -308,6 +327,23 @@ function renderAssets() {
     </section>
   `;
   bindCommonActions(elements.views.assets);
+}
+
+function renderAssetGroup(title, description, summaries, emptyText) {
+  return `
+    <div class="asset-group">
+      <div class="asset-group-header">
+        <div>
+          <h3>${title}</h3>
+          <p class="small-muted">${description}</p>
+        </div>
+        <span class="asset-count">${summaries.length}</span>
+      </div>
+      <div class="asset-list">
+        ${summaries.map(renderAssetCard).join('') || empty(emptyText)}
+      </div>
+    </div>
+  `;
 }
 
 function renderYear() {
@@ -571,10 +607,11 @@ function handleRecordSubmit(event) {
 function handleAssetSubmit(event) {
   event.preventDefault();
   const form = new FormData(elements.assetForm);
+  const category = normalizeAssetCategoryByClass(form.get('assetClassHint'), form.get('category'));
   state.assets.push({
     id: `asset-${Date.now()}`,
     name: form.get('name').trim(),
-    category: form.get('category'),
+    category,
     currency: form.get('currency'),
     status: form.get('status'),
     note: form.get('note').trim(),
@@ -585,6 +622,32 @@ function handleAssetSubmit(event) {
   elements.assetDialog.close();
   toast('已新增资产');
   render();
+}
+
+function openAssetDialog() {
+  elements.assetForm.reset();
+  syncAssetCategoryOptions();
+  elements.assetDialog.showModal();
+}
+
+function syncAssetCategoryOptions() {
+  const assetClassHint = elements.assetForm.elements.assetClassHint?.value;
+  const categorySelect = elements.assetForm.elements.category;
+  if (!categorySelect) return;
+  const previousCategory = categorySelect.value;
+  const options = ASSET_CATEGORY_OPTIONS[assetClassHint] || ASSET_CATEGORY_OPTIONS.cashflow;
+  categorySelect.innerHTML = options
+    .map((option) => `<option value="${option.value}">${option.label}</option>`)
+    .join('');
+  if (options.some((option) => option.value === previousCategory)) {
+    categorySelect.value = previousCategory;
+  }
+}
+
+function normalizeAssetCategoryByClass(assetClassHint, category) {
+  const options = ASSET_CATEGORY_OPTIONS[assetClassHint] || ASSET_CATEGORY_OPTIONS.cashflow;
+  if (!options.some((option) => option.value === category)) return options[0].value;
+  return category;
 }
 
 function handleImportSubmit(event) {
@@ -640,7 +703,7 @@ function bindCommonActions(root) {
       if (action !== 'asset-detail') event.stopPropagation();
       if (action === 'new-record') openRecordDialog();
       if (action === 'new-record-for-asset') openRecordDialog(element.dataset.assetId);
-      if (action === 'new-asset') elements.assetDialog.showModal();
+      if (action === 'new-asset') openAssetDialog();
       if (action === 'asset-detail') renderAssetDetail(element.dataset.assetId);
       if (action === 'year-view') switchView('year');
       if (action === 'records-view') switchView('records');
@@ -1226,6 +1289,8 @@ function categoryLabel(category) {
     business: '业务',
     stock: '股票',
     gold: '黄金',
+    crypto: 'Crypto',
+    fund: '基金',
     cash: '现金/收入',
     other: '其他',
   }[category] || category;
@@ -1236,6 +1301,8 @@ function categoryIcon(category) {
     business: '业',
     stock: '股',
     gold: '金',
+    crypto: '币',
+    fund: '基',
     cash: '现',
     other: '其',
   }[category] || '资';
@@ -1276,7 +1343,7 @@ function escapeAttr(value) {
 
 function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=26').then((registration) => {
+    navigator.serviceWorker.register('./sw.js?v=27').then((registration) => {
       registration.update().catch(() => {});
     }).catch(() => {});
   }

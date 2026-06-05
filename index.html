@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#101828">
     <title>赚米记录</title>
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=26">
+    <link rel="stylesheet" href="./styles.css?v=27">
   </head>
   <body>
     <section class="auth-gate" id="authGate" hidden>
@@ -94,15 +94,33 @@
         </div>
         <label>名称<input name="name" required placeholder="例如 新业务投资"></label>
         <div class="form-grid">
-          <label>类型
-            <select name="category" required>
-              <option value="business">业务</option>
-              <option value="stock">股票</option>
-              <option value="gold">黄金</option>
-              <option value="cash">现金/工资</option>
-              <option value="other">其他</option>
+          <label>资产大类
+            <select name="assetClassHint" required>
+              <option value="cashflow">实体/现金流</option>
+              <option value="investment">投资账户</option>
+              <option value="cash">当前存款/收入</option>
             </select>
           </label>
+          <label>具体类型
+            <select name="category" required>
+              <optgroup label="实体/现金流">
+                <option value="business">业务/实体投资</option>
+                <option value="other">其他实体资产</option>
+              </optgroup>
+              <optgroup label="投资账户">
+                <option value="stock">股票账户</option>
+                <option value="gold">黄金账户</option>
+                <option value="crypto">Crypto</option>
+                <option value="fund">基金账户</option>
+              </optgroup>
+              <optgroup label="当前存款/收入">
+                <option value="cash">现金/工资/存款</option>
+              </optgroup>
+            </select>
+          </label>
+        </div>
+        <p class="small-muted form-hint">实体分红会进入总营收；股票、黄金等账户内收益只进入投资盈亏。</p>
+        <div class="form-grid">
           <label>币种
             <select name="currency" required>
               <option value="CNY">人民币</option>
@@ -169,7 +187,7 @@
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="./site-config.js?v=26"></script>
-    <script type="module" src="./app.js?v=26"></script>
+    <script src="./site-config.js?v=27"></script>
+    <script type="module" src="./app.js?v=27"></script>
   </body>
 </html>
